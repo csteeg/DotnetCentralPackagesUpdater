@@ -8,11 +8,11 @@
 
         <!-- Global Tool Configuration -->
         <PackAsTool>true</PackAsTool>
-        <ToolCommandName>dotnet-cpupdate</ToolCommandName>
+        <ToolCommandName>cpup</ToolCommandName>
 
         <!-- Package Metadata -->
         <PackageId>CentralNuGetUpdater</PackageId>
-        <Version>1.0.0</Version>
+        <Version>1.1.0</Version>
         <Authors>Chris van de Steeg</Authors>
         <Description>A console application that helps you manage and update NuGet packages in .NET projects using Central Package Management (Directory.Packages.props). Uses the same credential providers as 'dotnet restore' for seamless
             authentication with private feeds.</Description>

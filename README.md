@@ -32,7 +32,7 @@ dotnet tool install -g CentralNuGetUpdater
 Then use it anywhere:
 
 ```bash
-dotnet-cpupdate --help
+cpup --help
 ```
 
 ### Option 2: Build from Source
@@ -76,7 +76,7 @@ Navigate to your .NET solution directory (containing `Directory.Packages.props`)
 
 ```bash
 # If installed as global tool
-dotnet-cpupdate
+cpup
 
 # If running from source
 dotnet run
@@ -88,7 +88,7 @@ dotnet run
 Central NuGet Package Updater - Check and update packages in Directory.Packages.props
 
 Usage:
-  dotnet-cpupdate [options]
+  cpup [options]
 
 Options:
   -p, --path <path>        Path to Directory.Packages.props file or the directory containing it [default: current directory]
@@ -105,7 +105,7 @@ Options:
 
 ```bash
 # Global tool
-dotnet-cpupdate
+cpup
 
 # From source
 dotnet run
@@ -115,31 +115,31 @@ dotnet run
 
 ```bash
 # Using directory path
-dotnet-cpupdate --path "C:\MyProject"
+cpup --path "C:\MyProject"
 
 # Using direct file path
-dotnet-cpupdate --path "C:\MyProject\Directory.Packages.props"
+cpup --path "C:\MyProject\Directory.Packages.props"
 
 # With custom nuget.config
-dotnet-cpupdate --path "C:\MyProject" --config "C:\MyProject\nuget.config"
+cpup --path "C:\MyProject" --config "C:\MyProject\nuget.config"
 ```
 
 #### Include prerelease versions
 
 ```bash
-dotnet-cpupdate --prerelease
+cpup --prerelease
 ```
 
 #### Dry run (preview only)
 
 ```bash
-dotnet-cpupdate --dry-run
+cpup --dry-run
 ```
 
 #### Combine options
 
 ```bash
-dotnet-cpupdate --path "C:\MyProject" --prerelease --dry-run
+cpup --path "C:\MyProject" --prerelease --dry-run
 ```
 
 ## Central Package Management Setup
