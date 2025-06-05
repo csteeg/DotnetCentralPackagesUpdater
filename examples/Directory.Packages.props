@@ -1,0 +1,18 @@
+<Project>
+
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Public packages from nuget.org -->
+        <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
+        <PackageVersion Include="Newtonsoft.Json" Version="13.0.1" />
+
+        <!-- Private packages that would require authentication -->
+        <PackageVersion Include="MyCompany.SharedLibrary" Version="1.0.0" />
+        <PackageVersion Include="MyCompany.Core.Authentication" Version="2.1.0" />
+        <PackageVersion Include="Internal.Utilities" Version="1.5.0" />
+    </ItemGroup>
+
+</Project> 
