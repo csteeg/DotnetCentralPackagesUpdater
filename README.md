@@ -21,7 +21,21 @@ A console application that helps you manage and update NuGet packages in .NET pr
 
 ## Installation
 
-### Option 1: Build from Source
+### Option 1: Global .NET Tool (Recommended)
+
+Install as a global .NET tool for easy access from anywhere:
+
+```bash
+dotnet tool install -g CentralNuGetUpdater
+```
+
+Then use it anywhere:
+
+```bash
+dotnet-cpupdate --help
+```
+
+### Option 2: Build from Source
 
 1. Clone or download this repository
 2. Navigate to the project directory
@@ -37,7 +51,7 @@ A console application that helps you manage and update NuGet packages in .NET pr
    dotnet run -- [options]
    ```
 
-### Option 2: Publish as Self-Contained
+### Option 3: Publish as Self-Contained
 
 1. Publish the application for your platform:
 
@@ -61,6 +75,10 @@ A console application that helps you manage and update NuGet packages in .NET pr
 Navigate to your .NET solution directory (containing `Directory.Packages.props`) and run:
 
 ```bash
+# If installed as global tool
+dotnet-cpupdate
+
+# If running from source
 dotnet run
 ```
 
@@ -70,7 +88,7 @@ dotnet run
 Central NuGet Package Updater - Check and update packages in Directory.Packages.props
 
 Usage:
-  CentralNuGetUpdater [options]
+  dotnet-cpupdate [options]
 
 Options:
   -p, --path <path>        Path to Directory.Packages.props file or the directory containing it [default: current directory]
@@ -86,6 +104,10 @@ Options:
 #### Check for updates in current directory
 
 ```bash
+# Global tool
+dotnet-cpupdate
+
+# From source
 dotnet run
 ```
 
@@ -93,31 +115,31 @@ dotnet run
 
 ```bash
 # Using directory path
-dotnet run -- --path "C:\MyProject"
+dotnet-cpupdate --path "C:\MyProject"
 
 # Using direct file path
-dotnet run -- --path "C:\MyProject\Directory.Packages.props"
+dotnet-cpupdate --path "C:\MyProject\Directory.Packages.props"
 
 # With custom nuget.config
-dotnet run -- --path "C:\MyProject" --config "C:\MyProject\nuget.config"
+dotnet-cpupdate --path "C:\MyProject" --config "C:\MyProject\nuget.config"
 ```
 
 #### Include prerelease versions
 
 ```bash
-dotnet run -- --prerelease
+dotnet-cpupdate --prerelease
 ```
 
 #### Dry run (preview only)
 
 ```bash
-dotnet run -- --dry-run
+dotnet-cpupdate --dry-run
 ```
 
 #### Combine options
 
 ```bash
-dotnet run -- --path "C:\MyProject" --prerelease --dry-run
+dotnet-cpupdate --path "C:\MyProject" --prerelease --dry-run
 ```
 
 ## Central Package Management Setup
@@ -268,6 +290,23 @@ Select packages to update:
   [X] Newtonsoft.Json (13.0.1 → 13.0.3)
   [X] Serilog (3.0.1 → 3.1.1)
 ```
+
+## Publishing as Global Tool
+
+To publish updates to NuGet.org:
+
+1. **Update version** in `CentralNuGetUpdater.csproj`
+2. **Create package:**
+
+   ```bash
+   dotnet pack -c Release
+   ```
+
+3. **Publish to NuGet.org:**
+
+   ```bash
+   dotnet nuget push bin/Release/CentralNuGetUpdater.*.nupkg --api-key YOUR_API_KEY --source https://api.nuget.org/v3/index.json
+   ```
 
 ## Contributing
 
