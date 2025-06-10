@@ -11,6 +11,8 @@ A console application that helps you manage and update NuGet packages in .NET pr
 - ✅ **Update Preview**: See current vs. latest versions before updating
 - ✅ **Dry Run Mode**: Preview what would be updated without making changes
 - ✅ **Prerelease Support**: Optionally include prerelease versions
+- ✅ **Conditional Package Support**: Handles framework-specific conditional packages
+- ✅ **Framework-Aware Updates**: Suggests appropriate versions per target framework
 - ✅ **Detailed Information**: Shows package descriptions and publish dates
 - ✅ **Error Handling**: Graceful handling of network issues and missing packages
 
@@ -171,6 +173,71 @@ If your project doesn't use Central Package Management yet, you need to:
 <!-- After -->
 <PackageReference Include="Microsoft.Extensions.Logging" />
 ```
+
+## Conditional Package Support
+
+The tool supports **conditional packages** with framework-specific conditions, which is especially useful for multi-targeting projects.
+
+### Framework-Specific Packages
+
+For projects that target multiple frameworks (e.g., `net8.0` and `net9.0`), you can use conditional packages:
+
+```xml
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Different versions for different frameworks -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authorization" Condition="'$(TargetFramework)' == 'net8.0'" Version="8.0.15" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authorization" Condition="'$(TargetFramework)' != 'net8.0'" Version="9.0.4" />
+    
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Condition="'$(TargetFramework)' == 'net8.0'" Version="8.0.16" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Condition="'$(TargetFramework)' != 'net8.0'" Version="9.0.5" />
+    
+    <!-- Non-conditional packages work as usual -->
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>
+```
+
+### Framework-Aware Version Selection
+
+The tool provides **intelligent framework-aware updates**:
+
+- **For `net8.0` packages**: Suggests the latest `8.x` version (e.g., `8.0.15 → 8.0.16`)
+- **For `net9.0` packages**: Suggests the latest `9.x` version (e.g., `9.0.4 → 9.0.5`)
+- **Prevents incompatible updates**: Won't suggest .NET 9 versions for .NET 8-specific conditions
+
+### Example Output with Conditional Packages
+
+```
+Packages with available updates:
+┌───────────────────────────────────────────────┬─────────────────┬────────────────┬───────────────────┐
+│ Package                                       │ Current Version │ Latest Version │ Target Frameworks │
+├───────────────────────────────────────────────┼─────────────────┼────────────────┼───────────────────┤
+│ Microsoft.AspNetCore.Authorization            │ 8.0.15          │ 8.0.16         │ net8.0            │
+│ ('$(TargetFramework)' == 'net8.0')            │                 │                │                   │
+│ Microsoft.AspNetCore.Authorization            │ 9.0.4           │ 9.0.5          │ net9.0            │
+│ ('$(TargetFramework)' != 'net8.0')            │                 │                │                   │
+└───────────────────────────────────────────────┴─────────────────┴────────────────┴───────────────────┘
+```
+
+### Supported Condition Patterns
+
+The tool supports the most common condition patterns:
+
+- **Equality**: `Condition="'$(TargetFramework)' == 'net8.0'"`
+- **Inequality**: `Condition="'$(TargetFramework)' != 'net8.0'"`
+- **More complex conditions**: Parsed and evaluated appropriately
+
+### Why Use Conditional Packages?
+
+1. **Multi-targeting projects**: Use the optimal package version for each target framework
+2. **Migration scenarios**: Gradually migrate from .NET 8 to .NET 9 while maintaining compatibility
+3. **Framework-specific features**: Use framework-specific APIs and optimizations
+4. **Dependency compatibility**: Ensure packages are compatible with specific .NET versions
 
 ## NuGet.config Support
 
