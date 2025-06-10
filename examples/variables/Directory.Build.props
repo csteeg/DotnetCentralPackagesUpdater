@@ -1,0 +1,62 @@
+<Project>
+  <!-- Nuget related properties.-->
+  <PropertyGroup>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <Product>CareConnections platform</Product>
+    <!-- allow pre-release dependencies -->
+    <NoWarn>$(NoWarn);NU5104;SA0001</NoWarn>
+    <DebugType>Portable</DebugType>
+    <LangVersion>12</LangVersion>
+    <HighEntropyVA>true</HighEntropyVA>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <Authors>CareConnections NCare development team</Authors>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>
+      $(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb
+    </AllowedOutputExtensionsInPackageBuildOutputFolder>
+    <Company>CareConnections</Company>
+    <Copyright>Copyright © CareConnections. All rights reserved.</Copyright>
+    <Deterministic>true</Deterministic>
+    <!--This will target the latest patch release of the runtime released with the current SDK.  -->
+    <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <TargetFramework></TargetFramework>
+    <TargetFrameworkNonPackages>net8.0</TargetFrameworkNonPackages>
+    <TargetFrameworkLegacyPackages>net8.0;net9.0;netstandard2.0;netstandard2.1;</TargetFrameworkLegacyPackages>
+    <WarningsNotAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ContainerRepository>$(MSBuildProjectName.ToLower())</ContainerRepository>
+    <ContainerUser>root</ContainerUser>
+  </PropertyGroup>
+  <ItemGroup>
+    <ContainerEnvironmentVariable Include="TZ" Value="Europe/Amsterdam" />
+    <ContainerPort Include="$(80)" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content  Condition="$(MSBuildProjectName.Contains('Tests'))" Include="$(MSBuildThisFileDirectory)xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>$(MSBuildProjectName).Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)\stylecop.json" Link="stylecop.json" />
+    <None Include="$(MSBuildThisFileDirectory)LICENSE.txt" Link="LICENSE.txt">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+      <Visible>True</Visible>
+    </None>
+  </ItemGroup>
+</Project>

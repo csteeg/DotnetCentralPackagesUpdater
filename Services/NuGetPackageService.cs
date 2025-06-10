@@ -3,6 +3,8 @@ using NuGet.Configuration;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
+using NuGet.Frameworks;
+using NuGet.Packaging.Core;
 using CentralNuGetUpdater.Models;
 using System.Net;
 using NuGet.Credentials;
@@ -78,14 +80,14 @@ public class NuGetPackageService
         }
     }
 
-    public async Task<string?> GetLatestVersionAsync(string packageId, bool includePrerelease = false)
+    public async Task<string?> GetLatestVersionAsync(string packageId, bool includePrerelease = false, CancellationToken cancellationToken = default)
     {
         foreach (var repository in _sourceRepositories)
         {
             try
             {
                 var resource = await repository.GetResourceAsync<FindPackageByIdResource>();
-                var versions = await resource.GetAllVersionsAsync(packageId, new SourceCacheContext(), _logger, CancellationToken.None);
+                var versions = await resource.GetAllVersionsAsync(packageId, new SourceCacheContext(), _logger, cancellationToken);
 
                 if (versions?.Any() == true)
                 {
@@ -108,7 +110,150 @@ public class NuGetPackageService
         return null;
     }
 
-    public async Task<PackageInfo?> GetPackageInfoAsync(string packageId, bool includePrerelease = false)
+    public async Task<string?> GetLatestVersionForFrameworksAsync(string packageId, List<string> targetFrameworks, bool includePrerelease = false, CancellationToken cancellationToken = default)
+    {
+        if (!targetFrameworks.Any())
+        {
+            return await GetLatestVersionAsync(packageId, includePrerelease, cancellationToken);
+        }
+
+        var frameworks = targetFrameworks.Select(NuGetFramework.Parse).ToList();
+
+        foreach (var repository in _sourceRepositories)
+        {
+            try
+            {
+                var metadataResource = await repository.GetResourceAsync<PackageMetadataResource>();
+                var packages = await metadataResource.GetMetadataAsync(packageId, includePrerelease, false,
+                    new SourceCacheContext(), _logger, cancellationToken);
+
+                if (packages?.Any() == true)
+                {
+                    var compatiblePackages = new List<IPackageSearchMetadata>();
+
+                    // For framework-specific packages, prioritize framework-aligned versions
+                    if (IsFrameworkSpecificPackage(packageId))
+                    {
+                        // Group versions by major version
+                        var versionsByMajor = packages.GroupBy(p => p.Identity.Version.Major).OrderByDescending(g => g.Key);
+
+                        foreach (var targetFramework in targetFrameworks)
+                        {
+                            var frameworkMajorVersion = GetFrameworkMajorVersion(targetFramework);
+                            if (frameworkMajorVersion.HasValue)
+                            {
+                                // Find the latest version that matches the framework major version
+                                var matchingMajorGroup = versionsByMajor.FirstOrDefault(g => g.Key == frameworkMajorVersion.Value);
+                                if (matchingMajorGroup != null)
+                                {
+                                    var latestInGroup = matchingMajorGroup.OrderByDescending(p => p.Identity.Version).First();
+                                    if (!compatiblePackages.Contains(latestInGroup))
+                                    {
+                                        compatiblePackages.Add(latestInGroup);
+                                    }
+                                    break; // Found framework-appropriate version
+                                }
+                            }
+                        }
+                    }
+
+                    // If no framework-specific versions found, or package is not framework-specific, use regular compatibility checking
+                    if (!compatiblePackages.Any())
+                    {
+                        foreach (var package in packages.OrderByDescending(p => p.Identity.Version))
+                        {
+                            var dependencySets = package.DependencySets?.ToList();
+
+                            // If no dependency sets, assume it's compatible with all frameworks
+                            if (dependencySets == null || !dependencySets.Any())
+                            {
+                                compatiblePackages.Add(package);
+                                continue;
+                            }
+
+                            // Check if package supports any of our target frameworks
+                            bool isCompatible = false;
+                            foreach (var framework in frameworks)
+                            {
+                                var compatibleDependencySet = dependencySets.FirstOrDefault(ds =>
+                                    ds.TargetFramework.Equals(NuGetFramework.AnyFramework) ||
+                                    DefaultCompatibilityProvider.Instance.IsCompatible(framework, ds.TargetFramework));
+
+                                if (compatibleDependencySet != null)
+                                {
+                                    isCompatible = true;
+                                    break;
+                                }
+                            }
+
+                            if (isCompatible)
+                            {
+                                compatiblePackages.Add(package);
+                            }
+                        }
+                    }
+
+                    var latestCompatible = compatiblePackages.FirstOrDefault();
+                    if (latestCompatible != null)
+                    {
+                        return latestCompatible.Identity.Version.ToString();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _uiService.DisplayDebug($"Failed to check framework-specific version for {packageId} from {repository.PackageSource.Name}: {ex.Message}");
+                continue;
+            }
+        }
+
+        // Fallback to regular version check
+        return await GetLatestVersionAsync(packageId, includePrerelease, cancellationToken);
+    }
+
+    private int? GetFrameworkMajorVersion(string targetFramework)
+    {
+        // Extract major version from frameworks like "net8.0", "net9.0"
+        if (targetFramework.StartsWith("net") && targetFramework.Contains("."))
+        {
+            var versionPart = targetFramework.Substring(3); // Remove "net"
+            var dotIndex = versionPart.IndexOf('.');
+            if (dotIndex > 0)
+            {
+                var majorVersionStr = versionPart.Substring(0, dotIndex);
+                if (int.TryParse(majorVersionStr, out int majorVersion))
+                {
+                    return majorVersion;
+                }
+            }
+        }
+        return null;
+    }
+
+    private bool IsFrameworkSpecificPackage(string packageId)
+    {
+        // List of package prefixes that typically follow .NET framework versioning
+        var frameworkSpecificPrefixes = new[]
+        {
+            "Microsoft.AspNetCore",
+            "Microsoft.EntityFrameworkCore",
+            "Microsoft.Extensions",
+            "Microsoft.Maui",
+            "Microsoft.WindowsDesktop",
+            "Microsoft.VisualStudio.Web.CodeGeneration"
+        };
+
+        // Also check for packages that have .NET-aligned versioning patterns
+        var frameworkSpecificExactMatches = new[]
+        {
+            "System.Text.Json"
+        };
+
+        return frameworkSpecificPrefixes.Any(prefix => packageId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) ||
+               frameworkSpecificExactMatches.Any(exact => string.Equals(packageId, exact, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public async Task<PackageInfo?> GetPackageInfoAsync(string packageId, bool includePrerelease = false, CancellationToken cancellationToken = default)
     {
         foreach (var repository in _sourceRepositories)
         {
@@ -116,7 +261,7 @@ public class NuGetPackageService
             {
                 var metadataResource = await repository.GetResourceAsync<PackageMetadataResource>();
                 var packages = await metadataResource.GetMetadataAsync(packageId, includePrerelease, false,
-                    new SourceCacheContext(), _logger, CancellationToken.None);
+                    new SourceCacheContext(), _logger, cancellationToken);
 
                 var latestPackage = packages?.OrderByDescending(p => p.Identity.Version).FirstOrDefault();
 
@@ -144,37 +289,79 @@ public class NuGetPackageService
 
     public async Task CheckForUpdatesAsync(List<PackageInfo> packages, bool includePrerelease = false, bool dryRun = false)
     {
-        _uiService.DisplayInfo($"Checking for updates for {packages.Count} packages...");
-
-        var tasks = packages.Select(async package =>
+        // Check if we have framework information
+        var hasFrameworkInfo = packages.Any(p => p.TargetFrameworks.Any());
+        if (hasFrameworkInfo)
         {
-            try
-            {
-                var latestVersion = await GetLatestVersionAsync(package.Id, includePrerelease);
-                if (!string.IsNullOrEmpty(latestVersion))
-                {
-                    package.LatestVersion = latestVersion;
+            var allFrameworks = packages.SelectMany(p => p.TargetFrameworks).Distinct().ToList();
+            _uiService.DisplayInfo($"Using framework-aware updates for: {string.Join(", ", allFrameworks)}");
+        }
 
-                    // Get additional metadata
-                    var packageInfo = await GetPackageInfoAsync(package.Id, includePrerelease);
-                    if (packageInfo != null)
+        // Use progress display for better user experience
+        await _uiService.DisplayProgressWithUpdatesAsync(
+            $"Checking for updates",
+            packages,
+            async package =>
+            {
+                try
+                {
+                    // Add timeout for individual package processing
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+                    string? latestVersion = null;
+
+                    // Use framework-aware checking based on applicable frameworks from conditions
+                    if (package.ApplicableFrameworks.Any())
                     {
-                        package.Description = packageInfo.Description;
-                        package.Published = packageInfo.Published;
+                        // For conditional packages, use only the frameworks they apply to
+
+                        latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.ApplicableFrameworks, includePrerelease, cts.Token);
+                    }
+                    else if (package.TargetFrameworks.Any())
+                    {
+                        // For non-conditional packages, use all target frameworks
+                        latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.TargetFrameworks, includePrerelease, cts.Token);
+                    }
+                    else
+                    {
+                        latestVersion = await GetLatestVersionAsync(package.Id, includePrerelease, cts.Token);
+                    }
+
+                    if (!string.IsNullOrEmpty(latestVersion))
+                    {
+                        package.LatestVersion = latestVersion;
+
+                        // Get additional metadata (with timeout)
+                        try
+                        {
+                            var packageInfo = await GetPackageInfoAsync(package.Id, includePrerelease, cts.Token);
+                            if (packageInfo != null)
+                            {
+                                package.Description = packageInfo.Description;
+                                package.Published = packageInfo.Published;
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // Metadata timeout - that's OK, we have the version
+                            _uiService.DisplayDebug($"Metadata timeout for {package.Id}, but version found");
+                        }
+                    }
+                    else
+                    {
+                        _uiService.DisplayDebug($"No version found for {package.Id}");
                     }
                 }
-                else
+                catch (OperationCanceledException)
                 {
-                    _uiService.DisplayDebug($"No version found for {package.Id}");
+                    _uiService.DisplayWarning($"Timeout checking {package.Id} (30s limit)");
                 }
-            }
-            catch (Exception ex)
-            {
-                _uiService.DisplayError($"Error checking updates for {package.Id}: {ex.Message}");
-            }
-        });
-
-        await Task.WhenAll(tasks);
+                catch (Exception ex)
+                {
+                    _uiService.DisplayDebug($"Error checking updates for {package.Id}: {ex.Message}");
+                }
+            },
+            package => package.Id); // Show package name in progress
 
         // Report packages that couldn't be resolved
         var packagesWithoutVersion = packages.Where(p => string.IsNullOrEmpty(p.LatestVersion)).ToList();

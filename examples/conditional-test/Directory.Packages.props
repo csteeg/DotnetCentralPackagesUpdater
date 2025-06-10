@@ -1,0 +1,21 @@
+<Project>
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Non-conditional packages -->
+        <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+        <PackageVersion Include="AutoMapper" Version="14.0.0" />
+
+        <!-- Conditional packages for different frameworks -->
+        <PackageVersion Include="Microsoft.AspNetCore.Authorization" Condition="'$(TargetFramework)' == 'net8.0'" Version="8.0.15" />
+        <PackageVersion Include="Microsoft.AspNetCore.Authorization" Condition="'$(TargetFramework)' != 'net8.0'" Version="9.0.4" />
+
+        <PackageVersion Include="Microsoft.EntityFrameworkCore" Condition="'$(TargetFramework)' == 'net8.0'" Version="8.0.16" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore" Condition="'$(TargetFramework)' != 'net8.0'" Version="9.0.5" />
+
+        <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Condition="'$(TargetFramework)' == 'net8.0'" Version="8.0.15" />
+        <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Condition="'$(TargetFramework)' != 'net8.0'" Version="9.0.4" />
+    </ItemGroup>
+</Project> 

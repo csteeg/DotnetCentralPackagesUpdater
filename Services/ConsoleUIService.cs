@@ -5,29 +5,7 @@ namespace CentralNuGetUpdater.Services;
 
 public class ConsoleUIService
 {
-    private bool? _supportsAnsi;
 
-    private bool SupportsAnsi
-    {
-        get
-        {
-            if (_supportsAnsi.HasValue)
-                return _supportsAnsi.Value;
-
-            try
-            {
-                // Test if ANSI is supported by checking the console profile
-                _supportsAnsi = AnsiConsole.Profile.Capabilities.Interactive &&
-                               AnsiConsole.Profile.Capabilities.Ansi;
-                return _supportsAnsi.Value;
-            }
-            catch
-            {
-                _supportsAnsi = false;
-                return false;
-            }
-        }
-    }
 
     public void DisplayWelcome()
     {
@@ -47,6 +25,27 @@ public class ConsoleUIService
             return;
         }
 
+        // Show framework information if available
+        var hasFrameworkInfo = packages.Any(p => p.TargetFrameworks.Any());
+        var hasVariables = packages.Any(p => !string.IsNullOrEmpty(p.OriginalVersionExpression));
+
+        if (hasFrameworkInfo)
+        {
+            var allFrameworks = packages.SelectMany(p => p.TargetFrameworks).Distinct().ToList();
+            AnsiConsole.MarkupLine($"[bold cyan]Target Frameworks Detected:[/] {string.Join(", ", allFrameworks)}");
+        }
+
+        if (hasVariables)
+        {
+            var variableCount = packages.Count(p => !string.IsNullOrEmpty(p.OriginalVersionExpression));
+            AnsiConsole.MarkupLine($"[bold cyan]Variable Resolution:[/] {variableCount} packages using variables");
+        }
+
+        if (hasFrameworkInfo || hasVariables)
+        {
+            AnsiConsole.WriteLine();
+        }
+
         var packagesWithUpdates = packages.Where(p => p.HasUpdate).ToList();
         var packagesUpToDate = packages.Where(p => !p.HasUpdate && !string.IsNullOrEmpty(p.LatestVersion)).ToList();
         var packagesWithErrors = packages.Where(p => string.IsNullOrEmpty(p.LatestVersion)).ToList();
@@ -58,16 +57,51 @@ public class ConsoleUIService
             updateTable.AddColumn("Package");
             updateTable.AddColumn("Current Version");
             updateTable.AddColumn("Latest Version");
+
+            // Add target frameworks column if any package has framework information
+            if (hasFrameworkInfo)
+            {
+                updateTable.AddColumn("Target Frameworks");
+            }
+
             updateTable.AddColumn("Published");
 
             foreach (var package in packagesWithUpdates)
             {
-                updateTable.AddRow(
-                    $"[bold]{package.Id}[/]",
-                    $"[red]{package.CurrentVersion}[/]",
-                    $"[green]{package.LatestVersion}[/]",
-                    package.Published?.ToString("yyyy-MM-dd") ?? "N/A"
-                );
+                var currentVersion = package.CurrentVersion;
+                if (!string.IsNullOrEmpty(package.OriginalVersionExpression))
+                {
+                    currentVersion = $"{package.CurrentVersion} [dim]({package.OriginalVersionExpression})[/]";
+                }
+
+                var packageName = package.Id;
+                if (!string.IsNullOrEmpty(package.Condition))
+                {
+                    // Show condition for conditional packages
+                    packageName = $"{package.Id} [dim]({package.Condition})[/]";
+                }
+
+                var columns = new List<string>
+                {
+                    $"[bold]{packageName}[/]",
+                    $"[red]{currentVersion}[/]",
+                    $"[green]{package.LatestVersion}[/]"
+                };
+
+                // Add target frameworks if this table includes that column
+                if (hasFrameworkInfo)
+                {
+                    var frameworks = package.ApplicableFrameworks.Any()
+                        ? string.Join(", ", package.ApplicableFrameworks.Select(f => $"[dim]{f}[/]"))
+                        : package.TargetFrameworks.Any()
+                            ? string.Join(", ", package.TargetFrameworks.Select(f => $"[dim]{f}[/]"))
+                            : "[dim]All[/]";
+                    columns.Add(frameworks);
+                }
+
+                columns.Add(package.Published?.ToString("yyyy-MM-dd") ?? "N/A");
+
+                updateTable.AddRow(columns.ToArray());
             }
 
             AnsiConsole.Write(updateTable);
@@ -117,7 +151,21 @@ public class ConsoleUIService
         AnsiConsole.MarkupLine("[bold]Select packages to update:[/]");
 
         var choices = packagesWithUpdates.Select(p =>
-            $"{p.Id} ({p.CurrentVersion} → {p.LatestVersion})").ToList();
+        {
+            var frameworks = p.ApplicableFrameworks.Any()
+                ? $" [[{string.Join(", ", p.ApplicableFrameworks)}]]"  // Escape square brackets for Spectre.Console markup
+                : p.TargetFrameworks.Any()
+                    ? $" [[{string.Join(", ", p.TargetFrameworks)}]]"
+                    : "";
+
+            var packageName = p.Id;
+            if (!string.IsNullOrEmpty(p.Condition))
+            {
+                packageName = $"{p.Id} (condition: {p.Condition})";
+            }
+
+            return $"{packageName} ({p.CurrentVersion} → {p.LatestVersion}){frameworks}";
+        }).ToList();
 
         var prompt = new MultiSelectionPrompt<string>()
             .Title("Which packages would you like to update?")
@@ -133,40 +181,59 @@ public class ConsoleUIService
             prompt.Select(choice);
         }
 
-        if (SupportsAnsi)
+        try
         {
-            try
-            {
-                var selectedPackages = AnsiConsole.Prompt(prompt);
+            var selectedPackages = AnsiConsole.Prompt(prompt);
 
-                // Mark selected packages
-                foreach (var package in packagesWithUpdates)
+            // Mark selected packages
+            foreach (var package in packagesWithUpdates)
+            {
+                var frameworks = package.ApplicableFrameworks.Any()
+                    ? $" [[{string.Join(", ", package.ApplicableFrameworks)}]]"  // Escape square brackets for Spectre.Console markup
+                    : package.TargetFrameworks.Any()
+                        ? $" [[{string.Join(", ", package.TargetFrameworks)}]]"
+                        : "";
+
+                var packageName = package.Id;
+                if (!string.IsNullOrEmpty(package.Condition))
                 {
-                    var packageChoice = $"{package.Id} ({package.CurrentVersion} → {package.LatestVersion})";
-                    package.IsSelected = selectedPackages.Contains(packageChoice);
+                    packageName = $"{package.Id} (condition: {package.Condition})";
                 }
 
-                return packagesWithUpdates.Where(p => p.IsSelected).ToList();
+                var packageChoice = $"{packageName} ({package.CurrentVersion} → {package.LatestVersion}){frameworks}";
+                package.IsSelected = selectedPackages.Contains(packageChoice);
             }
-            catch
-            {
-                // Fall through to simple console method
-            }
-        }
 
-        // Fallback for terminals that don't support ANSI - select all packages by default
-        Console.WriteLine("All packages will be updated (ANSI not supported for interactive selection):");
-        for (int i = 0; i < packagesWithUpdates.Count; i++)
+            return packagesWithUpdates.Where(p => p.IsSelected).ToList();
+        }
+        catch
         {
-            var package = packagesWithUpdates[i];
-            Console.WriteLine($"{i + 1}. {package.Id} ({package.CurrentVersion} → {package.LatestVersion})");
-            package.IsSelected = true; // Select all by default
+            // Fallback for terminals that don't support interactive selection - select all packages by default
+            Console.WriteLine("Interactive selection not available - all packages will be updated:");
+            for (int i = 0; i < packagesWithUpdates.Count; i++)
+            {
+                var package = packagesWithUpdates[i];
+                var frameworks = package.ApplicableFrameworks.Any()
+                    ? $" [{string.Join(", ", package.ApplicableFrameworks)}]"  // No need to escape for plain Console.WriteLine
+                    : package.TargetFrameworks.Any()
+                        ? $" [{string.Join(", ", package.TargetFrameworks)}]"
+                        : "";
+
+                var packageName = package.Id;
+                if (!string.IsNullOrEmpty(package.Condition))
+                {
+                    packageName = $"{package.Id} (condition: {package.Condition})";
+                }
+
+                Console.WriteLine($"{i + 1}. {packageName} ({package.CurrentVersion} → {package.LatestVersion}){frameworks}");
+                package.IsSelected = true; // Select all by default
+            }
+
+            Console.WriteLine("Press Enter to continue with all packages, or Ctrl+C to cancel...");
+            Console.ReadLine();
+
+            return packagesWithUpdates;
         }
-
-        Console.WriteLine("Press Enter to continue with all packages, or Ctrl+C to cancel...");
-        Console.ReadLine();
-
-        return packagesWithUpdates;
     }
 
     public bool ConfirmUpdate(List<PackageInfo> selectedPackages)
@@ -184,13 +251,39 @@ public class ConsoleUIService
         summaryTable.AddColumn("Current Version");
         summaryTable.AddColumn("New Version");
 
+        // Add target frameworks column if any selected package has framework information
+        var hasFrameworksInSelection = selectedPackages.Any(p => p.TargetFrameworks.Any());
+        if (hasFrameworksInSelection)
+        {
+            summaryTable.AddColumn("Target Frameworks");
+        }
+
         foreach (var package in selectedPackages)
         {
-            summaryTable.AddRow(
-                package.Id,
+            var packageName = package.Id;
+            if (!string.IsNullOrEmpty(package.Condition))
+            {
+                packageName = $"{package.Id} [dim]({package.Condition})[/]";
+            }
+
+            var columns = new List<string>
+            {
+                packageName,
                 $"[red]{package.CurrentVersion}[/]",
                 $"[green]{package.LatestVersion}[/]"
-            );
+            };
+
+            if (hasFrameworksInSelection)
+            {
+                var frameworks = package.ApplicableFrameworks.Any()
+                    ? string.Join(", ", package.ApplicableFrameworks.Select(f => $"[dim]{f}[/]"))
+                    : package.TargetFrameworks.Any()
+                        ? string.Join(", ", package.TargetFrameworks.Select(f => $"[dim]{f}[/]"))
+                        : "[dim]All[/]";
+                columns.Add(frameworks);
+            }
+
+            summaryTable.AddRow(columns.ToArray());
         }
 
         AnsiConsole.Write(summaryTable);
@@ -208,6 +301,105 @@ public class ConsoleUIService
                 ctx.SpinnerStyle(Style.Parse("green"));
                 Thread.Sleep(1000); // Brief pause for visual feedback
             });
+    }
+
+    public async Task DisplayProgressWithUpdatesAsync<T>(string title, IEnumerable<T> items, Func<T, Task> action, Func<T, string>? getItemDescription = null, int maxConcurrency = 10)
+    {
+        var itemList = items.ToList();
+
+        // Try to use advanced progress display, fall back to simple if needed
+        try
+        {
+            var currentPackage = "";
+            var lockObject = new object();
+
+            await AnsiConsole.Live(new Panel($"[green]{title}[/]"))
+                .StartAsync(async ctx =>
+                {
+                    var table = new Table().BorderStyle(Style.Parse("dim"));
+                    table.AddColumn("Status");
+                    table.AddColumn("Progress");
+
+                    ctx.UpdateTarget(table);
+
+                    var totalCount = itemList.Count;
+                    var processed = 0;
+                    var batchSize = Math.Min(maxConcurrency, itemList.Count);
+
+                    for (int i = 0; i < itemList.Count; i += batchSize)
+                    {
+                        var batch = itemList.Skip(i).Take(batchSize);
+                        var batchTasks = batch.Select(async item =>
+                        {
+                            try
+                            {
+                                // Update current package being processed
+                                if (getItemDescription != null)
+                                {
+                                    lock (lockObject)
+                                    {
+                                        currentPackage = getItemDescription(item);
+                                    }
+                                }
+
+                                await action(item);
+                            }
+                            catch (Exception ex)
+                            {
+                                // Log error but don't stop processing
+                                AnsiConsole.WriteLine($"[red]Error processing {getItemDescription?.Invoke(item) ?? "item"}: {ex.Message}[/]");
+                            }
+
+                            var newProcessed = Interlocked.Increment(ref processed);
+
+                            // Update the display with fixed formatting
+                            lock (lockObject)
+                            {
+                                table.Rows.Clear();
+
+                                var progress = newProcessed == totalCount ? 100 : (int)((double)newProcessed / totalCount * 100);
+                                var progressBar = CreateProgressBar(progress);
+
+                                if (newProcessed < totalCount && !string.IsNullOrEmpty(currentPackage))
+                                {
+                                    table.AddRow(
+                                        $"[yellow]({newProcessed}/{totalCount})[/] [dim]{currentPackage.PadRight(30).Substring(0, Math.Min(30, currentPackage.Length))}[/]",
+                                        $"{progressBar} [dim]{progress}%[/]"
+                                    );
+                                }
+                                else
+                                {
+                                    table.AddRow(
+                                        $"[green]✓ Complete ({newProcessed}/{totalCount})[/]",
+                                        $"{progressBar} [green]{progress}%[/]"
+                                    );
+                                }
+
+                                ctx.UpdateTarget(table);
+                            }
+                        });
+
+                        await Task.WhenAll(batchTasks);
+                    }
+                });
+        }
+        catch
+        {
+            // Fallback for terminals that don't support progress bars
+            for (int i = 0; i < itemList.Count; i++)
+            {
+                var itemDesc = getItemDescription?.Invoke(itemList[i]) ?? "";
+                Console.WriteLine($"{title} ({i + 1}/{itemList.Count}) {itemDesc}...");
+                await action(itemList[i]);
+            }
+        }
+    }
+
+    private string CreateProgressBar(int percentage, int width = 40)
+    {
+        var filled = (int)(width * percentage / 100.0);
+        var empty = width - filled;
+        return $"[green]{new string('█', filled)}[/][dim]{new string('░', empty)}[/]";
     }
 
     public void DisplaySuccess(string message)
@@ -270,43 +462,38 @@ public class ConsoleUIService
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine($"[bold]Choose authentication method for {feedName}:[/]");
 
-        if (SupportsAnsi)
+        try
         {
-            try
-            {
-                return AnsiConsole.Prompt(
-                    new SelectionPrompt<string>()
-                        .Title("Authentication method:")
-                        .AddChoices(new[] {
-                            "Device Flow (Browser)",
-                            "Username/Password",
-                            "API Key",
-                            "Skip this feed"
-                        }));
-            }
-            catch
-            {
-                // Fall through to simple console method
-            }
+            return AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Authentication method:")
+                    .AddChoices(new[] {
+                        "Device Flow (Browser)",
+                        "Username/Password",
+                        "API Key",
+                        "Skip this feed"
+                    }));
         }
-
-        // Fallback for terminals that don't support ANSI
-        Console.WriteLine("Authentication method:");
-        Console.WriteLine("1. Device Flow (Browser)");
-        Console.WriteLine("2. Username/Password");
-        Console.WriteLine("3. API Key");
-        Console.WriteLine("4. Skip this feed");
-        Console.Write("Enter your choice (1-4): ");
-
-        var choice = Console.ReadLine();
-        return choice switch
+        catch
         {
-            "1" => "Device Flow (Browser)",
-            "2" => "Username/Password",
-            "3" => "API Key",
-            "4" => "Skip this feed",
-            _ => "Skip this feed" // Default to skip if invalid input
-        };
+            // Fallback for terminals that don't support interactive selection
+            Console.WriteLine("Authentication method:");
+            Console.WriteLine("1. Device Flow (Browser)");
+            Console.WriteLine("2. Username/Password");
+            Console.WriteLine("3. API Key");
+            Console.WriteLine("4. Skip this feed");
+            Console.Write("Enter your choice (1-4): ");
+
+            var choice = Console.ReadLine();
+            return choice switch
+            {
+                "1" => "Device Flow (Browser)",
+                "2" => "Username/Password",
+                "3" => "API Key",
+                "4" => "Skip this feed",
+                _ => "Skip this feed" // Default to skip if invalid input
+            };
+        }
     }
 
     public void DisplayDeviceCodeInstructions(string userCode, string verificationUrl)

@@ -1,0 +1,194 @@
+<Project>
+  <!-- Shared dependencies versions.-->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <Choose>
+  <ItemGroup>
+    <GlobalPackageReference Include="Microsoft.CodeAnalysis" Version="4.13.0" PrivateAssets="All" />
+    <GlobalPackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0" PrivateAssets="All" />
+    <GlobalPackageReference Include="Roslynator.Analyzers" Version="4.13.1" PrivateAssets="All" />
+    <GlobalPackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="All" />
+    <GlobalPackageReference Include="SonarAnalyzer.CSharp" Version="10.7.0.110445" PrivateAssets="All" />
+    <GlobalPackageReference Include="Meziantou.Analyzer" Version="2.0.188" PrivateAssets="All" />
+    <GlobalPackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="All" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Include="AspNetCore.HealthChecks.SqlServer" Version="9.0.0" />
+    <PackageVersion Include="Audit.HttpClient" Version="29.0.1" />
+    <PackageVersion Include="Audit.NET.AzureStorageBlobs" Version="29.0.1" />
+    <PackageVersion Include="Audit.WebApi.Core" Version="29.0.1" />
+    <PackageVersion Include="AutoBogus" Version="2.13.1" />
+    <PackageVersion Include="AutoBogus.FakeItEasy" Version="2.13.1" />
+    <PackageVersion Include="AutoFixture" Version="4.18.1" />
+    <PackageVersion Include="AutoMapper" Version="14.0.0" />
+    <PackageVersion Include="Azure.AI.OpenAI" Version="2.1.0" />
+    <PackageVersion Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.4.0" />
+    <PackageVersion Include="Azure.Identity" Version="1.14.0" />
+    <PackageVersion Include="Azure.Monitor.Query" Version="1.6.0" />
+    <PackageVersion Include="Azure.Search.Documents" Version="11.6.0" />
+    <PackageVersion Include="Azure.Security.KeyVault.Certificates" Version="4.7.0" />
+    <PackageVersion Include="Azure.Security.KeyVault.Keys" Version="4.7.0" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.24.0" />
+    <PackageVersion Include="Azure.Storage.Files.Shares" Version="12.22.0" />
+    <PackageVersion Include="Azure.Storage.Queues" Version="12.22.0" />
+    <PackageVersion Include="CareConnections.AuditLogging.Core" Version="5.6.0" />
+    <PackageVersion Include="CareConnections.AuditLogging.Messaging" Version="5.6.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Application" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Application.OData" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Authorization" Version="5.22.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Authorization.SmartOnFhir" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Caching.Core" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Caching.Redis" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Domain" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.FakeItEasy" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Fhir.Client" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Infrastructure.EfCore" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Infrastructure.EfCore.SqlServer" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Infrastructure.MongoDb" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.Microservice" Version="5.22.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.OpenTelemetry" Version="3.38.0" />
+    <PackageVersion Include="CareConnections.BuildingBlocks.TestBase" Version="5.22.0" />
+    <PackageVersion Include="CareConnections.Fhir.Base" Version="2.3.0" />
+    <PackageVersion Include="CareConnections.Fhir.Utils.Base" Version="2.1.0" />
+    <PackageVersion Include="CareConnections.Fhir.Utils.Core" Version="2.1.0" />
+    <PackageVersion Include="CareConnections.Messaging.Core" Version="5.10.0" />
+    <PackageVersion Include="CareConnections.Messaging.Grpc" Version="5.10.0" />
+    <PackageVersion Include="CareConnections.Messaging.Grpc.Support" Version="5.10.0" />
+    <PackageVersion Include="CareConnections.Messaging.MassTransit" Version="5.10.0" />
+    <PackageVersion Include="CareConnections.Messaging.MassTransit.Ui" Version="5.10.0" />
+    <PackageVersion Include="CareConnections.Messaging.Mvc" Version="5.10.0" />
+    <PackageVersion Include="CareConnections.Messaging.Shared" Version="5.10.0" />
+    <PackageVersion Include="CareConnections.Reflection" Version="1.0.2" />
+    <PackageVersion Include="CareConnections.Utilities" Version="2.1.0" />
+    <PackageVersion Include="CareConnections.Utilities.Core" Version="2.1.0" />
+    <PackageVersion Include="CareConnections.ZorgApp.Data.Contract" Version="25.4.9.3" />
+    <PackageVersion Include="Community.OData.Linq" Version="2.1.0" />
+    <PackageVersion Include="Elsa.Secrets.Api" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Secrets.Core" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Secrets.Management" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Secrets.Models" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Secrets.Persistence.EntityFrameworkCore.SqlServer" Version="3.3.5" />
+    <PackageVersion Include="LinqKit.Core" Version="1.2.8" />
+    <PackageVersion Include="DistributedLock.Redis" Version="1.0.3" />
+    <PackageVersion Include="Docker.DotNet" Version="3.125.15" />
+    <PackageVersion Include="Duende.AccessTokenManagement.OpenIdConnect" Version="3.1.1" />
+    <PackageVersion Include="Elsa" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Common" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Caching" Version="3.3.5" />
+    <PackageVersion Include="Elsa.CSharp" Version="3.3.5" />
+    <PackageVersion Include="Elsa.EntityFrameworkCore" Version="3.3.5" />
+    <PackageVersion Include="Elsa.EntityFrameworkCore.SqlServer" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Features" Version="3.3.5" />
+    <PackageVersion Include="Elsa.FileStorage" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Http" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Labels" Version="3.3.5" />
+    <PackageVersion Include="Elsa.MassTransit" Version="3.3.5" />
+    <PackageVersion Include="Elsa.MassTransit.RabbitMq" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Retention" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Scheduling" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Webhooks" Version="3.3.5" />
+    <PackageVersion Include="Elsa.WorkflowContexts" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Workflows.Api" Version="3.3.5" />
+    <PackageVersion Include="Elsa.EMail" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Workflows.Core" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Workflows.Management" Version="3.3.5" />
+    <PackageVersion Include="Elsa.Workflows.Runtime" Version="3.3.5" />
+    <PackageVersion Include="FakeItEasy" Version="8.3.0" />
+    <PackageVersion Include="FluentAssertions" Version="7.0.0" />
+    <PackageVersion Include="FluentStorage.Azure.Files" Version="5.2.2" />
+    <PackageVersion Include="FluentValidation" Version="11.11.0" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+    <PackageVersion Include="Flurl" Version="4.0.0" />
+    <PackageVersion Include="Grpc.AspNetCore.Web" Version="2.67.0" />
+    <PackageVersion Include="Hl7.Fhir.R4" Version="5.11.7" />
+    <PackageVersion Include="Hl7.Fhir.Conformance" Version="5.11.7" />
+    <PackageVersion Include="IdentityModel" Version="7.0.0" />
+    <PackageVersion Include="LinqKit" Version="1.3.8" />
+    <PackageVersion Include="Markdig" Version="0.41.1" />
+    <PackageVersion Include="MessagePack" Version="3.1.3" />
+    <PackageVersion Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
+    <PackageVersion Include="Microsoft.ApplicationInsights.WorkerService" Version="2.23.0" />
+    <PackageVersion Include="Microsoft.AspNetCore" Version="2.3.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authorization" Condition="'$(TargetFramework)' == 'net8.0' " Version="8.0.15" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authorization" Condition="'$(TargetFramework)' != 'net8.0' " Version="9.0.4" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Condition="'$(TargetFramework)' == 'net8.0' " Version="8.0.15" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Condition="'$(TargetFramework)' != 'net8.0' " Version="9.0.4" />
+    <PackageVersion Include="Microsoft.AspNetCore.Hosting.Abstractions" Version="2.3.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.JsonPatch" Condition="'$(TargetFramework)' == 'net8.0' " Version="8.0.15" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc" Version="2.3.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Core" Version="2.3.0" />
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Common" Version="4.13.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.13.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.13.0" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.0.2" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Condition="'$(TargetFramework)' == 'net8.0' " Version="8.0.16" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Condition="'$(TargetFramework)' != 'net8.0' " Version="9.0.5" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Condition="'$(TargetFramework)' == 'net8.0' " Version="8.0.15" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Condition="'$(TargetFramework)' == 'net8.0' " Version="8.0.15" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Condition="'$(TargetFramework)' == 'net8.0' " Version="8.0.15" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Condition="'$(TargetFramework)' == 'net8.0' " Version="8.0.15" />
+    <PackageVersion Include="Microsoft.Extensions.Azure" Version="1.11.0" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Health.Fhir.Anonymizer.R4.Core" Version="4.1.1.3" />
+    <PackageVersion Include="Microsoft.Health.Fhir.Api" Version="4.0.415" />
+    <PackageVersion Include="Microsoft.Health.Fhir.Azure" Version="4.0.415" />
+    <PackageVersion Include="Microsoft.Health.Fhir.Core" Version="4.0.415" />
+    <PackageVersion Include="Microsoft.Health.Fhir.CosmosDb" Version="4.0.415" />
+    <PackageVersion Include="Microsoft.Health.Fhir.R4.Api" Version="4.0.415" />
+    <PackageVersion Include="Microsoft.Health.Fhir.R4.Core" Version="4.0.415" />
+    <PackageVersion Include="Microsoft.Health.Fhir.R4.Web" Version="4.0.415" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageVersion Include="Microsoft.SqlServer.SqlManagementObjects" Version="172.61.0" />
+    <PackageVersion Include="Microsoft.TestPlatform" Version="17.12.0" />
+    <PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
+    <PackageVersion Include="MockQueryable.FakeItEasy" Version="7.0.3" />
+    <PackageVersion Include="MongoDB.Driver" Version="3.4.0" />
+    <PackageVersion Include="NCare.Auth.Application" Version="4.26.0-alpha.33" />
+    <PackageVersion Include="NCare.Auth.Fhir.R4" Version="4.26.0-alpha.33" />
+    <PackageVersion Include="NCare.Auth.Shared" Version="4.26.0-alpha.33" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="protobuf-net.Grpc.ClientFactory" Version="1.2.2" />
+    <PackageVersion Include="Stashbox.FakeItEasy" Version="4.8.0" />
+    <PackageVersion Include="System.ComponentModel.Annotations" Version="5.0.0" />
+    <PackageVersion Include="System.Formats.Asn1" Version="9.0.5" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.11.0" />
+    <PackageVersion Include="System.Data.SqlClient" Version="4.8.6" />
+    <PackageVersion Include="System.Linq.Async" Version="6.0.1" />
+    <PackageVersion Include="System.Runtime.Caching" Version="8.0.1" />
+    <PackageVersion Include="System.Net.Http" Version="4.3.4" />
+    <PackageVersion Include="System.Private.Uri" Version="4.3.2" />
+    <PackageVersion Include="System.ServiceModel.Primitives" Version="8.1.2" />
+    <PackageVersion Include="System.Text.Json" Version="9.0.5" />
+    <PackageVersion Include="System.Text.Encodings.Web" Version="9.0.5" />
+    <PackageVersion Include="System.Text.RegularExpressions" Version="4.3.1" />
+    <PackageVersion Include="System.Linq.Dynamic.Core" Version="1.6.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="Xunit.DependencyInjection" Version="9.7.1" />
+    <PackageVersion Include="xunit.extensibility.core" Version="2.9.3" />
+    <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageVersion>
+    <PackageVersion Include="coverlet.collector" Version="6.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageVersion>
+  </ItemGroup>
+</Project>
