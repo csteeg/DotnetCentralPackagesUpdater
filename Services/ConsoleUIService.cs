@@ -75,10 +75,21 @@ public class ConsoleUIService
                 }
 
                 var packageName = package.Id;
+                if (package.IsGlobal)
+                {
+                    packageName = $"{package.Id} [dim](Global)[/]";
+                }
                 if (!string.IsNullOrEmpty(package.Condition))
                 {
                     // Show condition for conditional packages
-                    packageName = $"{package.Id} [dim]({package.Condition})[/]";
+                    if (package.IsGlobal)
+                    {
+                        packageName = $"{package.Id} [dim](Global, {package.Condition})[/]";
+                    }
+                    else
+                    {
+                        packageName = $"{package.Id} [dim]({package.Condition})[/]";
+                    }
                 }
 
                 var columns = new List<string>
@@ -159,9 +170,20 @@ public class ConsoleUIService
                     : "";
 
             var packageName = p.Id;
+            if (p.IsGlobal)
+            {
+                packageName = $"{p.Id} (Global)";
+            }
             if (!string.IsNullOrEmpty(p.Condition))
             {
-                packageName = $"{p.Id} (condition: {p.Condition})";
+                if (p.IsGlobal)
+                {
+                    packageName = $"{p.Id} (Global, condition: {p.Condition})";
+                }
+                else
+                {
+                    packageName = $"{p.Id} (condition: {p.Condition})";
+                }
             }
 
             return $"{packageName} ({p.CurrentVersion} → {p.LatestVersion}){frameworks}";
@@ -195,9 +217,20 @@ public class ConsoleUIService
                         : "";
 
                 var packageName = package.Id;
+                if (package.IsGlobal)
+                {
+                    packageName = $"{package.Id} (Global)";
+                }
                 if (!string.IsNullOrEmpty(package.Condition))
                 {
-                    packageName = $"{package.Id} (condition: {package.Condition})";
+                    if (package.IsGlobal)
+                    {
+                        packageName = $"{package.Id} (Global, condition: {package.Condition})";
+                    }
+                    else
+                    {
+                        packageName = $"{package.Id} (condition: {package.Condition})";
+                    }
                 }
 
                 var packageChoice = $"{packageName} ({package.CurrentVersion} → {package.LatestVersion}){frameworks}";
@@ -220,9 +253,20 @@ public class ConsoleUIService
                         : "";
 
                 var packageName = package.Id;
+                if (package.IsGlobal)
+                {
+                    packageName = $"{package.Id} (Global)";
+                }
                 if (!string.IsNullOrEmpty(package.Condition))
                 {
-                    packageName = $"{package.Id} (condition: {package.Condition})";
+                    if (package.IsGlobal)
+                    {
+                        packageName = $"{package.Id} (Global, condition: {package.Condition})";
+                    }
+                    else
+                    {
+                        packageName = $"{package.Id} (condition: {package.Condition})";
+                    }
                 }
 
                 Console.WriteLine($"{i + 1}. {packageName} ({package.CurrentVersion} → {package.LatestVersion}){frameworks}");
@@ -261,9 +305,20 @@ public class ConsoleUIService
         foreach (var package in selectedPackages)
         {
             var packageName = package.Id;
+            if (package.IsGlobal)
+            {
+                packageName = $"{package.Id} [dim](Global)[/]";
+            }
             if (!string.IsNullOrEmpty(package.Condition))
             {
-                packageName = $"{package.Id} [dim]({package.Condition})[/]";
+                if (package.IsGlobal)
+                {
+                    packageName = $"{package.Id} [dim](Global, {package.Condition})[/]";
+                }
+                else
+                {
+                    packageName = $"{package.Id} [dim]({package.Condition})[/]";
+                }
             }
 
             var columns = new List<string>

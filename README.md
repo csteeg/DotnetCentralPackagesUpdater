@@ -12,6 +12,7 @@ A console application that helps you manage and update NuGet packages in .NET pr
 - ✅ **Dry Run Mode**: Preview what would be updated without making changes
 - ✅ **Prerelease Support**: Optionally include prerelease versions
 - ✅ **Conditional Package Support**: Handles framework-specific conditional packages
+- ✅ **GlobalPackageReference Support**: Manages global analyzer and tool packages
 - ✅ **Framework-Aware Updates**: Suggests appropriate versions per target framework
 - ✅ **Detailed Information**: Shows package descriptions and publish dates
 - ✅ **Error Handling**: Graceful handling of network issues and missing packages
@@ -172,6 +173,53 @@ If your project doesn't use Central Package Management yet, you need to:
 
 <!-- After -->
 <PackageReference Include="Microsoft.Extensions.Logging" />
+```
+
+## GlobalPackageReference Support
+
+The tool fully supports **GlobalPackageReference** items, which are used for packages that should be applied to all projects in a solution (typically analyzers, code style tools, and build tools).
+
+### Global Package Management
+
+```xml
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Global packages applied to all projects -->
+    <GlobalPackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="8.0.0" PrivateAssets="All" />
+    <GlobalPackageReference Include="StyleCop.Analyzers" Version="1.1.118" PrivateAssets="All" />
+    <GlobalPackageReference Include="SonarAnalyzer.CSharp" Version="9.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Regular package versions -->
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>
+```
+
+### Global Package Features
+
+- **Automatic Detection**: Global packages are automatically identified and labeled as "(Global)" in the UI
+- **Update Management**: Global packages can be updated just like regular packages
+- **Mixed Support**: Works seamlessly alongside regular PackageVersion items
+- **Analyzer Focus**: Perfect for managing code analyzers, style checkers, and build tools
+
+### Example Output with Global Packages
+
+```
+Packages with available updates:
+┌──────────────────────────────────────────────┬─────────────────┬────────────────┐
+│ Package                                      │ Current Version │ Latest Version │
+├──────────────────────────────────────────────┼─────────────────┼────────────────┤
+│ Microsoft.Extensions.Logging                 │ 8.0.0           │ 8.0.1          │
+│ Microsoft.CodeAnalysis.NetAnalyzers (Global) │ 8.0.0           │ 9.0.0          │
+│ SonarAnalyzer.CSharp (Global)                │ 9.0.0           │ 10.11.0        │
+└──────────────────────────────────────────────┴─────────────────┴────────────────┘
 ```
 
 ## Conditional Package Support

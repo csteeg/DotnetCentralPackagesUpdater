@@ -22,13 +22,15 @@ public class DirectoryPackagesParser
             // Extract properties and variables from the file
             var properties = ExtractProperties(doc, solutionInfo);
 
-            var packageVersionElements = doc.Descendants("PackageVersion");
+            // Parse both PackageVersion and GlobalPackageReference elements
+            var packageElements = doc.Descendants("PackageVersion").Concat(doc.Descendants("GlobalPackageReference"));
 
-            foreach (var element in packageVersionElements)
+            foreach (var element in packageElements)
             {
                 var include = element.Attribute("Include")?.Value;
                 var version = element.Attribute("Version")?.Value;
                 var condition = element.Attribute("Condition")?.Value;
+                var isGlobal = element.Name.LocalName == "GlobalPackageReference";
 
                 if (!string.IsNullOrEmpty(include) && !string.IsNullOrEmpty(version))
                 {
@@ -40,7 +42,8 @@ public class DirectoryPackagesParser
                         Id = include,
                         CurrentVersion = resolvedVersion,
                         OriginalVersionExpression = version != resolvedVersion ? version : null,
-                        Condition = condition
+                        Condition = condition,
+                        IsGlobal = isGlobal
                     };
 
                     // Determine applicable frameworks based on condition
@@ -78,20 +81,22 @@ public class DirectoryPackagesParser
         try
         {
             var doc = await Task.Run(() => XDocument.Load(filePath));
-            var packageVersionElements = doc.Descendants("PackageVersion");
+            var packageElements = doc.Descendants("PackageVersion").Concat(doc.Descendants("GlobalPackageReference"));
 
-            foreach (var element in packageVersionElements)
+            foreach (var element in packageElements)
             {
                 var include = element.Attribute("Include")?.Value;
                 var condition = element.Attribute("Condition")?.Value;
+                var isGlobal = element.Name.LocalName == "GlobalPackageReference";
                 if (string.IsNullOrEmpty(include)) continue;
 
-                // Find matching package based on ID and condition
+                // Find matching package based on ID, condition, and global status
                 var packageToUpdate = packages.FirstOrDefault(p =>
                     p.Id == include &&
                     p.IsSelected &&
                     p.HasUpdate &&
-                    p.Condition == condition);
+                    p.Condition == condition &&
+                    p.IsGlobal == isGlobal);
 
                 if (packageToUpdate != null)
                 {

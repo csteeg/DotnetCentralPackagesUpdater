@@ -41,4 +41,5 @@ public class PackageInfo
     // Conditional package properties
     public string? Condition { get; set; } // The original condition from the XML
     public List<string> ApplicableFrameworks { get; set; } = new(); // Which frameworks this package applies to
+    public bool IsGlobal { get; set; } // Whether this is a GlobalPackageReference
 }
