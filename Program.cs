@@ -82,10 +82,15 @@ class Program
                 }
             }
 
+            // Analyze solution for target frameworks
+            ui.DisplayProgress("Analyzing solution and projects...");
+            var solutionAnalyzer = new SolutionAnalyzerService();
+            var solutionInfo = await AnalyzeSolutionInDirectoryAsync(solutionAnalyzer, path, ui);
+
             // Parse packages from Directory.Packages.props
             ui.DisplayProgress("Parsing Directory.Packages.props...");
             var parser = new DirectoryPackagesParser();
-            var packages = await parser.ParseDirectoryPackagesAsync(directoryPackagesPath);
+            var packages = await parser.ParseDirectoryPackagesAsync(directoryPackagesPath, solutionInfo);
 
             if (!packages.Any())
             {
@@ -159,5 +164,44 @@ class Program
                 ui.DisplayError($"Inner exception: {ex.InnerException.Message}");
             }
         }
+    }
+
+    static async Task<Models.SolutionInfo> AnalyzeSolutionInDirectoryAsync(SolutionAnalyzerService analyzer, string directoryPath, ConsoleUIService ui)
+    {
+        // First try to find a .sln file
+        var solutionFiles = Directory.GetFiles(directoryPath, "*.sln", SearchOption.TopDirectoryOnly);
+
+        if (solutionFiles.Length == 1)
+        {
+            ui.DisplayInfo($"Found solution file: {Path.GetFileName(solutionFiles[0])}");
+            var solutionInfo = await analyzer.AnalyzeSolutionAsync(solutionFiles[0]);
+
+            if (solutionInfo.Projects.Any())
+            {
+                var frameworks = string.Join(", ", solutionInfo.AllTargetFrameworks);
+                ui.DisplaySuccess($"Analyzed {solutionInfo.Projects.Count} projects targeting: {frameworks}");
+                return solutionInfo;
+            }
+        }
+        else if (solutionFiles.Length > 1)
+        {
+            ui.DisplayWarning($"Multiple solution files found, analyzing directory instead");
+        }
+
+        // Fallback to analyzing directory for .csproj files
+        ui.DisplayInfo("Analyzing all .csproj files in directory...");
+        var directoryInfo = await analyzer.AnalyzeDirectoryAsync(directoryPath);
+
+        if (directoryInfo.Projects.Any())
+        {
+            var frameworks = string.Join(", ", directoryInfo.AllTargetFrameworks);
+            ui.DisplaySuccess($"Analyzed {directoryInfo.Projects.Count} projects targeting: {frameworks}");
+        }
+        else
+        {
+            ui.DisplayWarning("No projects found for target framework analysis");
+        }
+
+        return directoryInfo;
     }
 }
