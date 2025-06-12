@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.4] - 2025-01-25
+
+### Fixed
+
+- **Migration Service**: Fixed XML processing issue where Version attributes weren't properly removed from PackageReference items during migration
+- **Project File Updates**: Migration now correctly removes all Version attributes to prevent conflicts with Central Package Management
+
+## [1.4.3] - 2025-01-25
+
+### Added
+
+- **🚀 Migration Tool**: New `migrate` command to convert solutions from regular PackageReference to Central Package Management
+- **Automated Conversion**: Scans all project files and extracts PackageReference items to create Directory.Packages.props
+- **Version Consolidation**: Automatically selects the highest version when multiple projects reference different versions of the same package
+- **Safe Migration**: Dry-run mode to preview changes before applying them
+- **Project File Updates**: Automatically removes Version attributes from PackageReference items in project files
+
+### Features
+
+- **Command**: `cpup migrate --solution . --dry-run` to preview migration
+- **Command**: `cpup migrate --solution .` to perform actual migration
+- **Smart Analysis**: Detects both .sln files and directory-based project discovery
+- **Progress Reporting**: Shows detailed progress and migration summary
+- **Error Handling**: Graceful handling of malformed project files
+
+### Technical Improvements
+
+- **Target Framework**: Updated from .NET 8.0 to .NET 9.0
+- **Migration Service**: New `CentralPackageMigrationService` for handling conversions
+- **XML Processing**: Case-insensitive XML parsing for robust project file handling
+
 ## [1.4.2] - 2025-01-25
 
 ### Fixed

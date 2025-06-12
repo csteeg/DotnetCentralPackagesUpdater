@@ -9,6 +9,7 @@ class Program
     {
         var rootCommand = new RootCommand("Central NuGet Package Updater - Check and update packages in Directory.Packages.props");
 
+        // Update command (default)
         var pathOption = new Option<string>(
             name: "--path",
             description: "Path to Directory.Packages.props file or the directory containing it",
@@ -32,10 +33,34 @@ class Program
             getDefaultValue: () => false);
         dryRunOption.AddAlias("-d");
 
+        // Migration command
+        var migrateCommand = new Command("migrate", "Migrate a solution from regular PackageReference to Central Package Management");
+
+        var migrateSolutionOption = new Option<string>(
+            name: "--solution",
+            description: "Path to solution file (.sln) or directory containing projects",
+            getDefaultValue: () => Directory.GetCurrentDirectory());
+        migrateSolutionOption.AddAlias("-s");
+
+        var migrateDryRunOption = new Option<bool>(
+            name: "--dry-run",
+            description: "Preview migration changes without modifying files",
+            getDefaultValue: () => false);
+        migrateDryRunOption.AddAlias("-d");
+
+        migrateCommand.AddOption(migrateSolutionOption);
+        migrateCommand.AddOption(migrateDryRunOption);
+
+        migrateCommand.SetHandler(async (solutionPath, dryRun) =>
+        {
+            await RunMigration(solutionPath, dryRun);
+        }, migrateSolutionOption, migrateDryRunOption);
+
         rootCommand.AddOption(pathOption);
         rootCommand.AddOption(configOption);
         rootCommand.AddOption(prereleaseOption);
         rootCommand.AddOption(dryRunOption);
+        rootCommand.AddCommand(migrateCommand);
 
         rootCommand.SetHandler(async (path, configPath, includePrerelease, dryRun) =>
         {
@@ -203,5 +228,37 @@ class Program
         }
 
         return directoryInfo;
+    }
+
+    static async Task RunMigration(string solutionPath, bool dryRun)
+    {
+        var ui = new ConsoleUIService();
+        ui.DisplayWelcome();
+
+        try
+        {
+            var migrationService = new CentralPackageMigrationService(ui);
+            var result = await migrationService.MigrateToCentralPackageManagementAsync(solutionPath, dryRun);
+
+            if (!result.Success)
+            {
+                ui.DisplayError($"Migration failed: {result.ErrorMessage}");
+                return;
+            }
+
+            if (dryRun)
+            {
+                ui.DisplayInfo("\n💡 To perform the actual migration, run the command again without --dry-run");
+            }
+        }
+        catch (Exception ex)
+        {
+            ui.DisplayError($"An error occurred during migration: {ex.Message}");
+
+            if (ex.InnerException != null)
+            {
+                ui.DisplayError($"Inner exception: {ex.InnerException.Message}");
+            }
+        }
     }
 }

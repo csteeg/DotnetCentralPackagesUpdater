@@ -1,18 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-
         <!-- Global Tool Configuration -->
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>cpup</ToolCommandName>
-
         <!-- Package Metadata -->
         <PackageId>CentralNuGetUpdater</PackageId>
-        <Version>1.4.2</Version>
+        <Version>1.4.4</Version>
         <Authors>Chris van de Steeg</Authors>
         <Description>A console application that helps you manage and update NuGet packages in .NET projects using Central Package Management (Directory.Packages.props). Supports conditional packages with framework-specific conditions,
             GlobalPackageReference items for analyzers and tools, and provides intelligent framework-aware version updates. Uses the same credential providers as 'dotnet restore' for seamless authentication with private feeds.</Description>
@@ -24,21 +21,18 @@
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     </PropertyGroup>
-
     <ItemGroup>
-        <PackageReference Include="NuGet.Protocol" Version="6.14.0" />
-        <PackageReference Include="NuGet.Configuration" Version="6.14.0" />
-        <PackageReference Include="NuGet.Versioning" Version="6.14.0" />
-        <PackageReference Include="NuGet.Credentials" Version="6.14.0" />
-        <PackageReference Include="Microsoft.Identity.Client" Version="4.72.1" />
-        <PackageReference Include="Spectre.Console" Version="0.50.0" />
-        <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+        <PackageReference Include="NuGet.Protocol" />
+        <PackageReference Include="NuGet.Configuration" />
+        <PackageReference Include="NuGet.Versioning" />
+        <PackageReference Include="NuGet.Credentials" />
+        <PackageReference Include="Microsoft.Identity.Client" />
+        <PackageReference Include="Spectre.Console" />
+        <PackageReference Include="System.CommandLine" />
     </ItemGroup>
-
     <ItemGroup>
         <None Include="README.md" Pack="true" PackagePath="/" />
         <None Include="LICENSE" Pack="true" PackagePath="/" />
         <None Include="CHANGELOG.md" Pack="true" PackagePath="/" />
     </ItemGroup>
-
-</Project> 
+</Project>

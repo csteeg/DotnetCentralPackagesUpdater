@@ -146,9 +146,108 @@ cpup --dry-run
 cpup --path "C:\MyProject" --prerelease --dry-run
 ```
 
-## Central Package Management Setup
+## 🚀 Migration to Central Package Management
 
-If your project doesn't use Central Package Management yet, you need to:
+**NEW in v1.4.3!** The tool now includes an automated migration feature to convert existing solutions from regular PackageReference to Central Package Management.
+
+### Quick Migration
+
+```bash
+# Preview migration changes (recommended first step)
+cpup migrate --solution . --dry-run
+
+# Perform the actual migration
+cpup migrate --solution .
+
+# Migrate specific solution file
+cpup migrate --solution MySolution.sln --dry-run
+```
+
+### What the Migration Does
+
+1. **📊 Analyzes** all project files in your solution
+2. **📦 Extracts** all PackageReference items with versions
+3. **🎯 Consolidates** packages (picks highest version when conflicts exist)
+4. **📄 Creates** Directory.Packages.props with centralized versions
+5. **🔧 Updates** project files by removing Version attributes from PackageReference items
+6. **✅ Validates** the solution still builds correctly
+
+### Migration Example
+
+**Before Migration:**
+```xml
+<!-- ProjectA.csproj -->
+<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+<PackageReference Include="Serilog" Version="3.0.1" />
+
+<!-- ProjectB.csproj -->
+<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+<PackageReference Include="AutoMapper" Version="12.0.0" />
+```
+
+**After Migration:**
+```xml
+<!-- Directory.Packages.props (created) -->
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="AutoMapper" Version="12.0.0" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="Serilog" Version="3.0.1" />
+  </ItemGroup>
+</Project>
+
+<!-- ProjectA.csproj (updated) -->
+<PackageReference Include="Newtonsoft.Json" />
+<PackageReference Include="Serilog" />
+
+<!-- ProjectB.csproj (updated) -->
+<PackageReference Include="Newtonsoft.Json" />
+<PackageReference Include="AutoMapper" />
+```
+
+### Migration Features
+
+- **🔍 Smart Discovery**: Works with both .sln files and directory-based project discovery
+- **📈 Version Consolidation**: Automatically picks the highest version when projects have different versions
+- **🛡️ Safe Migration**: Dry-run mode lets you preview all changes before applying
+- **🎯 Progress Tracking**: Shows detailed progress and summary of changes
+- **⚠️ Error Handling**: Gracefully handles malformed or problematic project files
+
+### Migration Output Example
+
+```
+🔄 Starting migration to Central Package Management...
+✓ Found 3 projects to analyze
+  📦 ProjectA.csproj: 5 package references
+  📦 ProjectB.csproj: 3 package references
+  📦 Tests.csproj: 2 package references
+✓ Found 8 unique packages across all projects
+
+📋 Migration Preview:
+  📄 Directory.Packages.props: C:\MyProject\Directory.Packages.props
+  📦 Packages to centralize: 8
+  🔧 Project files to modify: 3
+
+📦 Packages that will be centralized:
+  • AutoMapper → 12.0.0
+  • Microsoft.Extensions.Logging → 8.0.1
+  • Newtonsoft.Json → 13.0.3 (consolidated from versions: 13.0.1, 13.0.3)
+  • Serilog → 3.0.1
+
+🔧 Project files that will be modified:
+  • ProjectA.csproj (5 packages)
+  • ProjectB.csproj (3 packages)
+  • Tests.csproj (2 packages)
+
+💡 To perform the actual migration, run the command again without --dry-run
+```
+
+## Central Package Management Setup (Manual)
+
+If you prefer to set up Central Package Management manually, you need to:
 
 1. Create a `Directory.Packages.props` file in your solution root:
 
@@ -505,7 +604,21 @@ To publish updates to NuGet.org:
    dotnet nuget push bin/Release/CentralNuGetUpdater.*.nupkg --api-key YOUR_API_KEY --source https://api.nuget.org/v3/index.json
    ```
 
-## Recent Improvements (v1.4.2)
+## Recent Improvements (v1.4.3)
+
+### 🚀 NEW: Migration Tool
+- **Automated Migration**: New `migrate` command converts solutions from regular PackageReference to Central Package Management
+- **Smart Analysis**: Scans all projects and extracts package references automatically
+- **Version Consolidation**: Picks highest version when multiple projects use different versions of the same package
+- **Safe Preview**: Dry-run mode shows exactly what will be changed before applying
+- **Complete Automation**: Creates Directory.Packages.props and updates all project files
+
+### 🔧 Technical Improvements
+- **Target Framework**: Updated from .NET 8.0 to .NET 9.0
+- **Migration Service**: New comprehensive service for handling package reference conversions
+- **Enhanced Command Line**: Added subcommand support for better user experience
+
+## Previous Improvements (v1.4.2)
 
 ### 🛡️ Framework Compatibility Protection
 - **Intelligent Compatibility Checking**: Prevents incompatible package updates for multi-targeting projects
