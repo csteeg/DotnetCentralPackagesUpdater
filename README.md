@@ -604,9 +604,28 @@ To publish updates to NuGet.org:
    dotnet nuget push bin/Release/CentralNuGetUpdater.*.nupkg --api-key YOUR_API_KEY --source https://api.nuget.org/v3/index.json
    ```
 
-## Recent Improvements (v1.4.3)
+## Recent Improvements (v1.4.5)
 
-### 🚀 NEW: Migration Tool
+### 🎯 NEW: Smart Prerelease Handling
+- **Automatic Detection**: If a package is already using a prerelease version, automatically checks for newer prereleases and stable releases
+- **Visual Indicators**: Prerelease packages are clearly marked with "(pre)" in the UI
+- **Mixed Mode Support**: Some packages can be stable while others use prereleases - each handled appropriately
+- **No Extra Flags**: No need to use `--prerelease` flag for packages already using preview versions
+
+### Example: Prerelease Package Handling
+
+```bash
+# Your Directory.Packages.props contains:
+# <PackageVersion Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+
+cpup --path .
+# Tool automatically checks for both newer betas AND stable releases for System.CommandLine
+# Shows: System.CommandLine: 2.0.0-beta4.22272.1 (pre) → 2.0.0-beta5.23456.1
+```
+
+## Previous Improvements (v1.4.3)
+
+### 🚀 Migration Tool
 - **Automated Migration**: New `migrate` command converts solutions from regular PackageReference to Central Package Management
 - **Smart Analysis**: Scans all projects and extracts package references automatically
 - **Version Consolidation**: Picks highest version when multiple projects use different versions of the same package

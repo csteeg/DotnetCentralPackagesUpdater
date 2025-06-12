@@ -275,21 +275,23 @@ public class NuGetPackageService
 
                     string? latestVersion = null;
 
+                    // Determine if we should include prerelease for this specific package
+                    var packageIncludePrerelease = includePrerelease || IsCurrentVersionPrerelease(package.CurrentVersion);
+
                     // Use framework-aware checking based on applicable frameworks from conditions
                     if (package.ApplicableFrameworks.Any())
                     {
                         // For conditional packages, use only the frameworks they apply to
-
-                        latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.ApplicableFrameworks, includePrerelease, cts.Token);
+                        latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.ApplicableFrameworks, packageIncludePrerelease, cts.Token);
                     }
                     else if (package.TargetFrameworks.Any())
                     {
                         // For non-conditional packages, use all target frameworks
-                        latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.TargetFrameworks, includePrerelease, cts.Token);
+                        latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.TargetFrameworks, packageIncludePrerelease, cts.Token);
                     }
                     else
                     {
-                        latestVersion = await GetLatestVersionAsync(package.Id, includePrerelease, cts.Token);
+                        latestVersion = await GetLatestVersionAsync(package.Id, packageIncludePrerelease, cts.Token);
                     }
 
                     if (!string.IsNullOrEmpty(latestVersion))
@@ -299,7 +301,7 @@ public class NuGetPackageService
                         // Get additional metadata (with timeout)
                         try
                         {
-                            var packageInfo = await GetPackageInfoAsync(package.Id, includePrerelease, cts.Token);
+                            var packageInfo = await GetPackageInfoAsync(package.Id, packageIncludePrerelease, cts.Token);
                             if (packageInfo != null)
                             {
                                 package.Description = packageInfo.Description;
@@ -337,6 +339,26 @@ public class NuGetPackageService
             {
                 _uiService.DisplayWarning($"  - {pkg.Id}");
             }
+        }
+    }
+
+    private static bool IsCurrentVersionPrerelease(string version)
+    {
+        try
+        {
+            var nugetVersion = NuGetVersion.Parse(version);
+            return nugetVersion.IsPrerelease;
+        }
+        catch
+        {
+            // If parsing fails, check for common prerelease indicators
+            var lowerVersion = version.ToLowerInvariant();
+            return lowerVersion.Contains("alpha") ||
+                   lowerVersion.Contains("beta") ||
+                   lowerVersion.Contains("rc") ||
+                   lowerVersion.Contains("preview") ||
+                   lowerVersion.Contains("pre") ||
+                   lowerVersion.Contains("-");
         }
     }
 }

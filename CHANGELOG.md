@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.5] - 2025-01-25
+
+### Added
+
+- **🎯 Smart Prerelease Handling**: Automatically includes prerelease versions when checking for updates if the current package version is already a prerelease
+- **Visual Prerelease Indicators**: Current prerelease versions are marked with "(pre)" in the UI for easy identification
+- **Enhanced Version Detection**: Uses NuGet's official version parsing to accurately detect prerelease packages
+
+### Features
+
+- **Automatic Behavior**: No need to use `--prerelease` flag for packages already using preview versions
+- **Mixed Mode Support**: Some packages can be stable while others use prereleases, each handled appropriately
+- **UI Improvements**: Clear visual indication of which packages are using prerelease versions
+- **Example**: `System.CommandLine 2.0.0-beta4.22272.1 (pre)` automatically checks for newer betas and stable releases
+
+### Technical Improvements
+
+- **NuGet Version API**: Uses `NuGetVersion.IsPrerelease` for accurate prerelease detection
+- **Fallback Detection**: Secondary pattern matching for edge cases where version parsing fails
+- **Per-Package Logic**: Each package is evaluated individually for prerelease inclusion
+
 ## [1.4.4] - 2025-01-25
 
 ### Fixed

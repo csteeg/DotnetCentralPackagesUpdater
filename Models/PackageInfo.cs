@@ -33,6 +33,30 @@ public class PackageInfo
     public string? Description { get; set; }
     public DateTime? Published { get; set; }
 
+    // Prerelease properties
+    public bool IsCurrentVersionPrerelease
+    {
+        get
+        {
+            try
+            {
+                var nugetVersion = NuGetVersion.Parse(CurrentVersion);
+                return nugetVersion.IsPrerelease;
+            }
+            catch
+            {
+                // If parsing fails, check for common prerelease indicators
+                var lowerVersion = CurrentVersion.ToLowerInvariant();
+                return lowerVersion.Contains("alpha") ||
+                       lowerVersion.Contains("beta") ||
+                       lowerVersion.Contains("rc") ||
+                       lowerVersion.Contains("preview") ||
+                       lowerVersion.Contains("pre") ||
+                       lowerVersion.Contains("-");
+            }
+        }
+    }
+
     // Framework-aware properties
     public List<string> TargetFrameworks { get; set; } = new();
     public string? OriginalVersionExpression { get; set; } // For variables like $(MsLibsVersion)

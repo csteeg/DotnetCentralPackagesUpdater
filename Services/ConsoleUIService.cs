@@ -74,6 +74,12 @@ public class ConsoleUIService
                     currentVersion = $"{package.CurrentVersion} [dim]({package.OriginalVersionExpression})[/]";
                 }
 
+                // Add prerelease indicator to current version
+                if (package.IsCurrentVersionPrerelease)
+                {
+                    currentVersion = $"{currentVersion} [dim](pre)[/]";
+                }
+
                 var packageName = package.Id;
                 if (package.IsGlobal)
                 {
@@ -128,9 +134,15 @@ public class ConsoleUIService
 
             foreach (var package in packagesUpToDate)
             {
+                var version = package.CurrentVersion;
+                if (package.IsCurrentVersionPrerelease)
+                {
+                    version = $"{version} [dim](pre)[/]";
+                }
+
                 upToDateTable.AddRow(
                     package.Id,
-                    $"[green]{package.CurrentVersion}[/]"
+                    $"[green]{version}[/]"
                 );
             }
 
@@ -143,7 +155,13 @@ public class ConsoleUIService
             AnsiConsole.MarkupLine("[bold red]Packages with errors (couldn't check for updates):[/]");
             foreach (var package in packagesWithErrors)
             {
-                AnsiConsole.MarkupLine($"[red]• {package.Id} ({package.CurrentVersion})[/]");
+                var version = package.CurrentVersion;
+                if (package.IsCurrentVersionPrerelease)
+                {
+                    version = $"{version} (pre)";
+                }
+
+                AnsiConsole.MarkupLine($"[red]• {package.Id} ({version})[/]");
             }
             AnsiConsole.WriteLine();
         }
