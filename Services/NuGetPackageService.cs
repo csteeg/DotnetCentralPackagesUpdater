@@ -252,14 +252,18 @@ public class NuGetPackageService
         return null;
     }
 
-    public async Task CheckForUpdatesAsync(List<PackageInfo> packages, bool includePrerelease = false, bool dryRun = false)
+    public async Task CheckForUpdatesAsync(List<PackageInfo> packages, bool includePrerelease = false, bool dryRun = false, bool disableFrameworkCheck = false)
     {
         // Check if we have framework information
         var hasFrameworkInfo = packages.Any(p => p.TargetFrameworks.Any());
-        if (hasFrameworkInfo)
+        if (hasFrameworkInfo && !disableFrameworkCheck)
         {
             var allFrameworks = packages.SelectMany(p => p.TargetFrameworks).Distinct().ToList();
             _uiService.DisplayInfo($"Using framework-aware updates for: {string.Join(", ", allFrameworks)}");
+        }
+        else if (disableFrameworkCheck)
+        {
+            _uiService.DisplayInfo("Framework-aware checking disabled - checking all packages without framework constraints");
         }
 
         // Use progress display for better user experience
@@ -278,20 +282,34 @@ public class NuGetPackageService
                     // Determine if we should include prerelease for this specific package
                     var packageIncludePrerelease = includePrerelease || IsCurrentVersionPrerelease(package.CurrentVersion);
 
-                    // Use framework-aware checking based on applicable frameworks from conditions
-                    if (package.ApplicableFrameworks.Any())
+                    // Skip framework-aware checking for analyzer packages or if disabled
+                    var shouldSkipFrameworkCheck = disableFrameworkCheck ||
+                                                 package.IsAnalyzerPackage ||
+                                                 package.HasPrivateAssets;
+
+                    if (shouldSkipFrameworkCheck)
                     {
-                        // For conditional packages, use only the frameworks they apply to
-                        latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.ApplicableFrameworks, packageIncludePrerelease, cts.Token);
-                    }
-                    else if (package.TargetFrameworks.Any())
-                    {
-                        // For non-conditional packages, use all target frameworks
-                        latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.TargetFrameworks, packageIncludePrerelease, cts.Token);
+                        // Use simple version checking for analyzer packages and when framework checking is disabled
+                        _uiService.DisplayDebug($"Skipping framework check for {package.Id} (analyzer: {package.IsAnalyzerPackage}, private assets: {package.HasPrivateAssets}, disabled: {disableFrameworkCheck})");
+                        latestVersion = await GetLatestVersionAsync(package.Id, packageIncludePrerelease, cts.Token);
                     }
                     else
                     {
-                        latestVersion = await GetLatestVersionAsync(package.Id, packageIncludePrerelease, cts.Token);
+                        // Use framework-aware checking based on applicable frameworks from conditions
+                        if (package.ApplicableFrameworks.Any())
+                        {
+                            // For conditional packages, use only the frameworks they apply to
+                            latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.ApplicableFrameworks, packageIncludePrerelease, cts.Token);
+                        }
+                        else if (package.TargetFrameworks.Any())
+                        {
+                            // For non-conditional packages, use all target frameworks
+                            latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.TargetFrameworks, packageIncludePrerelease, cts.Token);
+                        }
+                        else
+                        {
+                            latestVersion = await GetLatestVersionAsync(package.Id, packageIncludePrerelease, cts.Token);
+                        }
                     }
 
                     if (!string.IsNullOrEmpty(latestVersion))

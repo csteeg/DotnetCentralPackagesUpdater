@@ -66,4 +66,10 @@ public class PackageInfo
     public string? Condition { get; set; } // The original condition from the XML
     public List<string> ApplicableFrameworks { get; set; } = new(); // Which frameworks this package applies to
     public bool IsGlobal { get; set; } // Whether this is a GlobalPackageReference
+
+    // Analyzer and build tool properties
+    public bool HasPrivateAssets { get; set; } // Whether this package has PrivateAssets="All"
+    public bool IsAnalyzerPackage { get; set; } // Whether this is likely an analyzer package
+    public string? PrivateAssets { get; set; } // The actual PrivateAssets value
+    public string? IncludeAssets { get; set; } // The IncludeAssets value
 }

@@ -33,6 +33,12 @@ class Program
             getDefaultValue: () => false);
         dryRunOption.AddAlias("-d");
 
+        var disableFrameworkCheckOption = new Option<bool>(
+            name: "--disable-framework-check",
+            description: "Disable framework-aware checking (useful for analyzer packages)",
+            getDefaultValue: () => false);
+        disableFrameworkCheckOption.AddAlias("--no-framework-check");
+
         // Migration command
         var migrateCommand = new Command("migrate", "Migrate a solution from regular PackageReference to Central Package Management");
 
@@ -60,17 +66,18 @@ class Program
         rootCommand.AddOption(configOption);
         rootCommand.AddOption(prereleaseOption);
         rootCommand.AddOption(dryRunOption);
+        rootCommand.AddOption(disableFrameworkCheckOption);
         rootCommand.AddCommand(migrateCommand);
 
-        rootCommand.SetHandler(async (path, configPath, includePrerelease, dryRun) =>
+        rootCommand.SetHandler(async (path, configPath, includePrerelease, dryRun, disableFrameworkCheck) =>
         {
-            await RunUpdater(path, configPath, includePrerelease, dryRun);
-        }, pathOption, configOption, prereleaseOption, dryRunOption);
+            await RunUpdater(path, configPath, includePrerelease, dryRun, disableFrameworkCheck);
+        }, pathOption, configOption, prereleaseOption, dryRunOption, disableFrameworkCheckOption);
 
         return await rootCommand.InvokeAsync(args);
     }
 
-    static async Task RunUpdater(string path, string? configPath, bool includePrerelease, bool dryRun)
+    static async Task RunUpdater(string path, string? configPath, bool includePrerelease, bool dryRun, bool disableFrameworkCheck)
     {
         var ui = new ConsoleUIService();
         ui.DisplayWelcome();
@@ -131,7 +138,7 @@ class Program
 
             // Check for updates
             ui.DisplayProgress("Checking for package updates...");
-            await nugetService.CheckForUpdatesAsync(packages, includePrerelease, dryRun);
+            await nugetService.CheckForUpdatesAsync(packages, includePrerelease, dryRun, disableFrameworkCheck);
 
             // Display results
             ui.DisplayPackages(packages);

@@ -47,6 +47,8 @@ public class DirectoryPackagesParser
                 var include = GetAttributeCaseInsensitive(element, "Include")?.Value;
                 var version = GetAttributeCaseInsensitive(element, "Version")?.Value;
                 var condition = GetAttributeCaseInsensitive(element, "Condition")?.Value;
+                var privateAssets = GetAttributeCaseInsensitive(element, "PrivateAssets")?.Value;
+                var includeAssets = GetAttributeCaseInsensitive(element, "IncludeAssets")?.Value;
                 var isGlobal = IsElementNameMatch(element, "GlobalPackageReference");
 
                 if (!string.IsNullOrEmpty(include) && !string.IsNullOrEmpty(version))
@@ -54,13 +56,32 @@ public class DirectoryPackagesParser
                     // Resolve variables in version
                     var resolvedVersion = ResolveVariables(version, properties, solutionInfo);
 
+                    // Check for PrivateAssets in child elements if not found as attribute
+                    if (string.IsNullOrEmpty(privateAssets))
+                    {
+                        var privateAssetsElement = GetDescendantsCaseInsensitive(element, "PrivateAssets").FirstOrDefault();
+                        privateAssets = privateAssetsElement?.Value;
+                    }
+
+                    // Check for IncludeAssets in child elements if not found as attribute
+                    if (string.IsNullOrEmpty(includeAssets))
+                    {
+                        var includeAssetsElement = GetDescendantsCaseInsensitive(element, "IncludeAssets").FirstOrDefault();
+                        includeAssets = includeAssetsElement?.Value;
+                    }
+
                     var packageInfo = new PackageInfo
                     {
                         Id = include,
                         CurrentVersion = resolvedVersion,
                         OriginalVersionExpression = version != resolvedVersion ? version : null,
                         Condition = condition,
-                        IsGlobal = isGlobal
+                        IsGlobal = isGlobal,
+                        PrivateAssets = privateAssets,
+                        IncludeAssets = includeAssets,
+                        HasPrivateAssets = !string.IsNullOrEmpty(privateAssets) &&
+                                         privateAssets.Equals("All", StringComparison.OrdinalIgnoreCase),
+                        IsAnalyzerPackage = IsAnalyzerOrTestPackage(include, privateAssets, includeAssets)
                     };
 
                     // Determine applicable frameworks based on condition
@@ -252,5 +273,83 @@ public class DirectoryPackagesParser
         }
 
         return resolved;
+    }
+
+    private bool IsAnalyzerOrTestPackage(string packageId, string? privateAssets, string? includeAssets)
+    {
+        // Check if package has PrivateAssets="All" (common for analyzers)
+        var hasPrivateAssetsAll = !string.IsNullOrEmpty(privateAssets) &&
+                                 privateAssets.Equals("All", StringComparison.OrdinalIgnoreCase);
+
+        // Check if IncludeAssets contains "analyzers" 
+        var includesAnalyzers = !string.IsNullOrEmpty(includeAssets) &&
+                               includeAssets.Contains("analyzers", StringComparison.OrdinalIgnoreCase);
+
+        // Check for common analyzer package name patterns
+        var analyzerNamePatterns = new[]
+        {
+            "analyzer", "analyzers", "codeanalysis", "stylecop", "sonar", "roslynator",
+            "meziantou", "idisposable", "asyncfixer", "codecracker", "refactoring",
+            "diagnostic", "fxcop", "security", "reliability", "performance"
+        };
+
+        var hasAnalyzerNamePattern = analyzerNamePatterns.Any(pattern =>
+            packageId.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+
+        // Check for specific well-known analyzer packages
+        var knownAnalyzerPackages = new[]
+        {
+            "Microsoft.CodeAnalysis.NetAnalyzers",
+            "Microsoft.CodeAnalysis.Analyzers",
+            "Microsoft.CodeAnalysis.CSharp.Analyzers",
+            "Microsoft.CodeAnalysis.VisualBasic.Analyzers",
+            "StyleCop.Analyzers",
+            "SonarAnalyzer.CSharp",
+            "Roslynator.Analyzers",
+            "Meziantou.Analyzer",
+            "IDisposableAnalyzers",
+            "AsyncFixer",
+            "Microsoft.CodeQuality.Analyzers",
+            "Microsoft.NetCore.Analyzers",
+            "Microsoft.NetFramework.Analyzers",
+            "Text.Analyzers",
+            "Microsoft.CodeAnalysis.BannedApiAnalyzers",
+            "Microsoft.CodeAnalysis.PublicApiAnalyzers"
+        };
+
+        var isKnownAnalyzer = knownAnalyzerPackages.Any(known =>
+            packageId.Equals(known, StringComparison.OrdinalIgnoreCase));
+
+        // Check for test packages that often have framework compatibility issues
+        var knownTestPackages = new[]
+        {
+            "xunit.v3",
+            "xunit",
+            "xunit.core",
+            "xunit.extensibility.core",
+            "xunit.runner.visualstudio",
+            "coverlet.collector",
+            "coverlet.msbuild",
+            "Microsoft.NET.Test.Sdk",
+            "NUnit",
+            "NUnit3TestAdapter",
+            "MSTest.TestAdapter",
+            "MSTest.TestFramework"
+        };
+
+        var isKnownTestPackage = knownTestPackages.Any(known =>
+            packageId.Equals(known, StringComparison.OrdinalIgnoreCase));
+
+        // Check for test-related name patterns
+        var testNamePatterns = new[]
+        {
+            "test", "testing", "coverlet", "coverage", "mock", "fake", "stub"
+        };
+
+        var hasTestNamePattern = testNamePatterns.Any(pattern =>
+            packageId.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+
+        return hasPrivateAssetsAll || includesAnalyzers || hasAnalyzerNamePattern ||
+               isKnownAnalyzer || isKnownTestPackage || hasTestNamePattern;
     }
 }

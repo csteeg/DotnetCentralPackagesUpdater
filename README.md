@@ -13,6 +13,7 @@ A console application that helps you manage and update NuGet packages in .NET pr
 - ✅ **Prerelease Support**: Optionally include prerelease versions
 - ✅ **Conditional Package Support**: Handles framework-specific conditional packages
 - ✅ **GlobalPackageReference Support**: Manages global analyzer and tool packages
+- ✅ **🔧 Analyzer Package Support**: Automatic detection and smart handling of analyzer packages and test tools
 - ✅ **Framework-Aware Updates**: Intelligent compatibility checking based on actual package metadata
 - ✅ **Directory.Build.props Support**: Automatically detects target frameworks from Directory.Build.props files
 - ✅ **Detailed Information**: Shows package descriptions and publish dates
@@ -95,12 +96,13 @@ Usage:
   cpup [options]
 
 Options:
-  -p, --path <path>        Path to Directory.Packages.props file or the directory containing it [default: current directory]
-  -c, --config <config>    Path to nuget.config file (optional)
-  --pre, --prerelease      Include prerelease versions when checking for updates [default: False]
-  -d, --dry-run           Show what would be updated without making changes [default: False]
-  --version               Show version information
-  -?, -h, --help          Show help and usage information
+  -p, --path <path>                                Path to Directory.Packages.props file or the directory containing it [default: current directory]
+  -c, --config <config>                            Path to nuget.config file (optional)
+  --pre, --prerelease                              Include prerelease versions when checking for updates [default: False]
+  -d, --dry-run                                    Show what would be updated without making changes [default: False]
+  --disable-framework-check, --no-framework-check  Disable framework-aware checking (useful for analyzer packages) [default: False]
+  --version                                        Show version information
+  -?, -h, --help                                   Show help and usage information
 ```
 
 ### Examples
@@ -138,6 +140,16 @@ cpup --prerelease
 
 ```bash
 cpup --dry-run
+```
+
+#### Disable framework checking for analyzer packages
+
+```bash
+# Automatic analyzer detection (default behavior)
+cpup --dry-run
+
+# Disable framework checking for all packages
+cpup --disable-framework-check --dry-run
 ```
 
 #### Combine options
@@ -273,6 +285,82 @@ If you prefer to set up Central Package Management manually, you need to:
 
 <!-- After -->
 <PackageReference Include="Microsoft.Extensions.Logging" />
+```
+
+## 🔧 Analyzer Package Support
+
+**NEW in v1.5.0!** The tool now provides intelligent handling of analyzer packages and test tools that often have framework compatibility issues.
+
+### Automatic Detection
+
+The tool automatically detects analyzer packages and test tools based on:
+
+- **PrivateAssets="All"**: Packages with this attribute are automatically identified as analyzer packages
+- **IncludeAssets containing "analyzers"**: Packages that explicitly include analyzer assets
+- **Common Name Patterns**: Packages with names containing "analyzer", "stylecop", "sonar", "roslynator", etc.
+- **Well-Known Packages**: Comprehensive list of known analyzer packages like:
+  - `Microsoft.CodeAnalysis.NetAnalyzers`
+  - `StyleCop.Analyzers`
+  - `SonarAnalyzer.CSharp`
+  - `Roslynator.Analyzers`
+  - `xunit.v3`, `coverlet.collector`
+  - And many more...
+
+### Smart Framework Bypass
+
+Analyzer packages automatically skip framework compatibility checks because:
+- They typically work across all .NET versions
+- Framework constraints often prevent legitimate updates
+- They're build-time tools, not runtime dependencies
+
+### Visual Indicators
+
+Analyzer packages are clearly marked in the UI:
+
+```
+Packages with available updates:
+┌─────────────────────────────┬─────────────────┬────────────────┐
+│ Package                     │ Current Version │ Latest Version │
+├─────────────────────────────┼─────────────────┼────────────────┤
+│ Microsoft.NET.Test.Sdk      │ 17.13.0         │ 17.14.1        │
+│ (Analyzer/Test)             │                 │                │
+│ Roslynator.Analyzers        │ 4.12.7          │ 4.13.1         │
+│ (Global, Analyzer/Test)     │                 │                │
+│ SonarAnalyzer.CSharp        │ 9.32.0.97167    │ 10.11.0.117924 │
+│ (Global, Analyzer/Test)     │                 │                │
+└─────────────────────────────┴─────────────────┴────────────────┘
+```
+
+### Framework Check Override
+
+For complete control, you can disable framework checking for all packages:
+
+```bash
+# Disable framework checking for all packages
+cpup --disable-framework-check --dry-run
+
+# Alternative alias
+cpup --no-framework-check --dry-run
+```
+
+### Before vs. After
+
+**Before v1.5.0:**
+```
+Packages with errors (couldn't check for updates):
+• xunit.v3 (2.0.3)
+• coverlet.collector (6.0.4)
+• Microsoft.CodeAnalysis.NetAnalyzers (9.0.0)
+• Roslynator.Analyzers (4.12.7)
+• SonarAnalyzer.CSharp (9.32.0.97167)
+```
+
+**After v1.5.0:**
+```
+Packages with available updates:
+• Microsoft.NET.Test.Sdk (Analyzer/Test): 17.13.0 → 17.14.1
+• Roslynator.Analyzers (Global, Analyzer/Test): 4.12.7 → 4.13.1
+• SonarAnalyzer.CSharp (Global, Analyzer/Test): 9.32.0.97167 → 10.11.0.117924
 ```
 
 ## GlobalPackageReference Support

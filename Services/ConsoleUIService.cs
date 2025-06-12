@@ -81,21 +81,24 @@ public class ConsoleUIService
                 }
 
                 var packageName = package.Id;
+                var indicators = new List<string>();
+
                 if (package.IsGlobal)
                 {
-                    packageName = $"{package.Id} [dim](Global)[/]";
+                    indicators.Add("Global");
+                }
+                if (package.IsAnalyzerPackage)
+                {
+                    indicators.Add("Analyzer/Test");
                 }
                 if (!string.IsNullOrEmpty(package.Condition))
                 {
-                    // Show condition for conditional packages
-                    if (package.IsGlobal)
-                    {
-                        packageName = $"{package.Id} [dim](Global, {package.Condition})[/]";
-                    }
-                    else
-                    {
-                        packageName = $"{package.Id} [dim]({package.Condition})[/]";
-                    }
+                    indicators.Add(package.Condition);
+                }
+
+                if (indicators.Any())
+                {
+                    packageName = $"{package.Id} [dim]({string.Join(", ", indicators)})[/]";
                 }
 
                 var columns = new List<string>

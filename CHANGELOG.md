@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2025-01-25
+
+### Added
+
+- **🔧 Analyzer Package Support**: Automatic detection and handling of analyzer packages and test tools
+- **Smart Framework Bypass**: Packages with `PrivateAssets="All"` automatically skip framework compatibility checks
+- **Enhanced Package Detection**: Intelligent identification of analyzer packages based on:
+  - `PrivateAssets="All"` attribute detection
+  - `IncludeAssets` containing "analyzers"
+  - Common analyzer package name patterns (StyleCop, SonarAnalyzer, Roslynator, etc.)
+  - Well-known analyzer packages (Microsoft.CodeAnalysis.NetAnalyzers, etc.)
+  - Test packages (xunit.v3, coverlet.collector, Microsoft.NET.Test.Sdk, etc.)
+- **Framework Check Override**: New `--disable-framework-check` option to bypass framework compatibility for all packages
+- **Visual Package Indicators**: Package names now show "(Analyzer/Test)", "(Global)", and condition indicators
+
+### Fixed
+
+- **Analyzer Package Updates**: Resolved issue where analyzer packages couldn't be checked for updates due to framework compatibility constraints
+- **Test Tool Updates**: Fixed update checking for test packages like xunit.v3, coverlet.collector, and Microsoft.NET.Test.Sdk
+- **Framework Compatibility**: Analyzer packages now use simple version checking instead of framework-aware checking
+
+### Features
+
+- **Automatic Detection**: No configuration needed - analyzer packages are automatically identified and handled appropriately
+- **Command Line Option**: `--disable-framework-check` or `--no-framework-check` to disable framework checking for all packages
+- **Enhanced UI**: Clear visual distinction between regular packages, analyzer packages, and global packages
+- **Backward Compatibility**: All existing functionality preserved while adding new capabilities
+
+### Technical Improvements
+
+- **PackageInfo Model**: Added `HasPrivateAssets`, `IsAnalyzerPackage`, `PrivateAssets`, and `IncludeAssets` properties
+- **DirectoryPackagesParser**: Enhanced to detect PrivateAssets and IncludeAssets attributes (both XML attributes and child elements)
+- **NuGetPackageService**: Modified to skip framework checks for analyzer packages automatically
+- **ConsoleUIService**: Updated to display package type indicators in the UI
+
+### Examples
+
+```bash
+# Default behavior (automatic analyzer detection)
+cpup --path "C:\Projects\MyProject" --dry-run
+
+# Disable framework checking for all packages
+cpup --path "C:\Projects\MyProject" --disable-framework-check --dry-run
+```
+
 ## [1.4.5] - 2025-01-25
 
 ### Added
