@@ -6,6 +6,22 @@ namespace CentralNuGetUpdater.Services;
 
 public class DirectoryPackagesParser
 {
+    // Helper methods for case-insensitive XML parsing
+    private static IEnumerable<XElement> GetDescendantsCaseInsensitive(XContainer container, string elementName)
+    {
+        return container.Descendants().Where(e => string.Equals(e.Name.LocalName, elementName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static XAttribute? GetAttributeCaseInsensitive(XElement element, string attributeName)
+    {
+        return element.Attributes().FirstOrDefault(a => string.Equals(a.Name.LocalName, attributeName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsElementNameMatch(XElement element, string elementName)
+    {
+        return string.Equals(element.Name.LocalName, elementName, StringComparison.OrdinalIgnoreCase);
+    }
+
     public async Task<List<PackageInfo>> ParseDirectoryPackagesAsync(string filePath, SolutionInfo? solutionInfo = null)
     {
         if (!File.Exists(filePath))
@@ -22,15 +38,16 @@ public class DirectoryPackagesParser
             // Extract properties and variables from the file
             var properties = ExtractProperties(doc, solutionInfo);
 
-            // Parse both PackageVersion and GlobalPackageReference elements
-            var packageElements = doc.Descendants("PackageVersion").Concat(doc.Descendants("GlobalPackageReference"));
+            // Parse both PackageVersion and GlobalPackageReference elements (case-insensitive)
+            var packageElements = GetDescendantsCaseInsensitive(doc, "PackageVersion")
+                .Concat(GetDescendantsCaseInsensitive(doc, "GlobalPackageReference"));
 
             foreach (var element in packageElements)
             {
-                var include = element.Attribute("Include")?.Value;
-                var version = element.Attribute("Version")?.Value;
-                var condition = element.Attribute("Condition")?.Value;
-                var isGlobal = element.Name.LocalName == "GlobalPackageReference";
+                var include = GetAttributeCaseInsensitive(element, "Include")?.Value;
+                var version = GetAttributeCaseInsensitive(element, "Version")?.Value;
+                var condition = GetAttributeCaseInsensitive(element, "Condition")?.Value;
+                var isGlobal = IsElementNameMatch(element, "GlobalPackageReference");
 
                 if (!string.IsNullOrEmpty(include) && !string.IsNullOrEmpty(version))
                 {
@@ -81,13 +98,14 @@ public class DirectoryPackagesParser
         try
         {
             var doc = await Task.Run(() => XDocument.Load(filePath));
-            var packageElements = doc.Descendants("PackageVersion").Concat(doc.Descendants("GlobalPackageReference"));
+            var packageElements = GetDescendantsCaseInsensitive(doc, "PackageVersion")
+                .Concat(GetDescendantsCaseInsensitive(doc, "GlobalPackageReference"));
 
             foreach (var element in packageElements)
             {
-                var include = element.Attribute("Include")?.Value;
-                var condition = element.Attribute("Condition")?.Value;
-                var isGlobal = element.Name.LocalName == "GlobalPackageReference";
+                var include = GetAttributeCaseInsensitive(element, "Include")?.Value;
+                var condition = GetAttributeCaseInsensitive(element, "Condition")?.Value;
+                var isGlobal = IsElementNameMatch(element, "GlobalPackageReference");
                 if (string.IsNullOrEmpty(include)) continue;
 
                 // Find matching package based on ID, condition, and global status
@@ -100,7 +118,7 @@ public class DirectoryPackagesParser
 
                 if (packageToUpdate != null)
                 {
-                    var versionAttribute = element.Attribute("Version");
+                    var versionAttribute = GetAttributeCaseInsensitive(element, "Version");
                     if (versionAttribute != null)
                     {
                         versionAttribute.Value = packageToUpdate.LatestVersion!;
@@ -120,8 +138,8 @@ public class DirectoryPackagesParser
     {
         var properties = new Dictionary<string, string>();
 
-        // Extract properties from PropertyGroup elements
-        foreach (var propertyGroup in doc.Descendants("PropertyGroup"))
+        // Extract properties from PropertyGroup elements (case-insensitive)
+        foreach (var propertyGroup in GetDescendantsCaseInsensitive(doc, "PropertyGroup"))
         {
             foreach (var property in propertyGroup.Elements())
             {
@@ -137,15 +155,15 @@ public class DirectoryPackagesParser
         {
             var frameworks = solutionInfo.AllTargetFrameworks;
 
-            // Process Choose/When conditions
-            foreach (var choose in doc.Descendants("Choose"))
+            // Process Choose/When conditions (case-insensitive)
+            foreach (var choose in GetDescendantsCaseInsensitive(doc, "Choose"))
             {
-                foreach (var when in choose.Descendants("When"))
+                foreach (var when in GetDescendantsCaseInsensitive(choose, "When"))
                 {
-                    var condition = when.Attribute("Condition")?.Value;
+                    var condition = GetAttributeCaseInsensitive(when, "Condition")?.Value;
                     if (!string.IsNullOrEmpty(condition) && EvaluateCondition(condition, frameworks))
                     {
-                        foreach (var propertyGroup in when.Descendants("PropertyGroup"))
+                        foreach (var propertyGroup in GetDescendantsCaseInsensitive(when, "PropertyGroup"))
                         {
                             foreach (var property in propertyGroup.Elements())
                             {

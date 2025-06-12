@@ -6,6 +6,11 @@ namespace CentralNuGetUpdater.Services;
 
 public class SolutionAnalyzerService
 {
+    // Helper methods for case-insensitive XML parsing
+    private static IEnumerable<XElement> GetDescendantsCaseInsensitive(XContainer container, string elementName)
+    {
+        return container.Descendants().Where(e => string.Equals(e.Name.LocalName, elementName, StringComparison.OrdinalIgnoreCase));
+    }
     public async Task<SolutionInfo> AnalyzeSolutionAsync(string solutionPath)
     {
         var solutionInfo = new SolutionInfo { SolutionPath = solutionPath };
@@ -127,8 +132,8 @@ public class SolutionAnalyzerService
     {
         var frameworks = new List<string>();
 
-        // Look for TargetFramework (single)
-        var targetFramework = doc.Descendants("TargetFramework").FirstOrDefault()?.Value;
+        // Look for TargetFramework (single) - case-insensitive
+        var targetFramework = GetDescendantsCaseInsensitive(doc, "TargetFramework").FirstOrDefault()?.Value;
         if (!string.IsNullOrEmpty(targetFramework))
         {
             var resolvedFramework = ResolveVariables(targetFramework, properties);
@@ -138,8 +143,8 @@ public class SolutionAnalyzerService
             }
         }
 
-        // Look for TargetFrameworks (multiple, semicolon-separated)
-        var targetFrameworks = doc.Descendants("TargetFrameworks").FirstOrDefault()?.Value;
+        // Look for TargetFrameworks (multiple, semicolon-separated) - case-insensitive
+        var targetFrameworks = GetDescendantsCaseInsensitive(doc, "TargetFrameworks").FirstOrDefault()?.Value;
         if (!string.IsNullOrEmpty(targetFrameworks))
         {
             var resolvedFrameworks = ResolveVariables(targetFrameworks, properties);
@@ -151,6 +156,34 @@ public class SolutionAnalyzerService
             }
         }
 
+        // If no frameworks were found in the project XML, fall back to checking global properties
+        if (frameworks.Count == 0 && properties != null)
+        {
+            // Check for TargetFramework in global properties
+            if (properties.TryGetValue("TargetFramework", out var globalTargetFramework)
+                && !string.IsNullOrEmpty(globalTargetFramework))
+            {
+                var resolvedFramework = ResolveVariables(globalTargetFramework, properties);
+                if (!string.IsNullOrEmpty(resolvedFramework))
+                {
+                    frameworks.Add(resolvedFramework);
+                }
+            }
+
+            // Check for TargetFrameworks in global properties
+            if (properties.TryGetValue("TargetFrameworks", out var globalTargetFrameworks)
+                && !string.IsNullOrEmpty(globalTargetFrameworks))
+            {
+                var resolvedFrameworks = ResolveVariables(globalTargetFrameworks, properties);
+                if (!string.IsNullOrEmpty(resolvedFrameworks))
+                {
+                    frameworks.AddRange(resolvedFrameworks.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(f => f.Trim())
+                        .Where(f => !string.IsNullOrEmpty(f)));
+                }
+            }
+        }
+
         return frameworks.Distinct().ToList();
     }
 
@@ -158,7 +191,7 @@ public class SolutionAnalyzerService
     {
         var properties = new Dictionary<string, string>();
 
-        foreach (var propertyGroup in doc.Descendants("PropertyGroup"))
+        foreach (var propertyGroup in GetDescendantsCaseInsensitive(doc, "PropertyGroup"))
         {
             foreach (var property in propertyGroup.Elements())
             {

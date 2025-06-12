@@ -12,7 +12,7 @@
 
         <!-- Package Metadata -->
         <PackageId>CentralNuGetUpdater</PackageId>
-        <Version>1.3.0</Version>
+        <Version>1.4.2</Version>
         <Authors>Chris van de Steeg</Authors>
         <Description>A console application that helps you manage and update NuGet packages in .NET projects using Central Package Management (Directory.Packages.props). Supports conditional packages with framework-specific conditions,
             GlobalPackageReference items for analyzers and tools, and provides intelligent framework-aware version updates. Uses the same credential providers as 'dotnet restore' for seamless authentication with private feeds.</Description>
@@ -38,6 +38,7 @@
     <ItemGroup>
         <None Include="README.md" Pack="true" PackagePath="/" />
         <None Include="LICENSE" Pack="true" PackagePath="/" />
+        <None Include="CHANGELOG.md" Pack="true" PackagePath="/" />
     </ItemGroup>
 
 </Project> 

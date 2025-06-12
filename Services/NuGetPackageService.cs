@@ -5,6 +5,7 @@ using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
 using NuGet.Frameworks;
 using NuGet.Packaging.Core;
+using NuGet.Packaging;
 using CentralNuGetUpdater.Models;
 using System.Net;
 using NuGet.Credentials;
@@ -131,59 +132,61 @@ public class NuGetPackageService
                 {
                     var compatiblePackages = new List<IPackageSearchMetadata>();
 
-                    // For framework-specific packages, prioritize framework-aligned versions
-                    if (IsFrameworkSpecificPackage(packageId))
-                    {
-                        // Group versions by major version
-                        var versionsByMajor = packages.GroupBy(p => p.Identity.Version.Major).OrderByDescending(g => g.Key);
-
-                        foreach (var targetFramework in targetFrameworks)
-                        {
-                            var frameworkMajorVersion = GetFrameworkMajorVersion(targetFramework);
-                            if (frameworkMajorVersion.HasValue)
-                            {
-                                // Find the latest version that matches the framework major version
-                                var matchingMajorGroup = versionsByMajor.FirstOrDefault(g => g.Key == frameworkMajorVersion.Value);
-                                if (matchingMajorGroup != null)
-                                {
-                                    var latestInGroup = matchingMajorGroup.OrderByDescending(p => p.Identity.Version).First();
-                                    if (!compatiblePackages.Contains(latestInGroup))
-                                    {
-                                        compatiblePackages.Add(latestInGroup);
-                                    }
-                                    break; // Found framework-appropriate version
-                                }
-                            }
-                        }
-                    }
-
-                    // If no framework-specific versions found, or package is not framework-specific, use regular compatibility checking
-                    if (!compatiblePackages.Any())
+                    // Use comprehensive compatibility checking based on package metadata
                     {
                         foreach (var package in packages.OrderByDescending(p => p.Identity.Version))
                         {
+                            bool isCompatible = false;
                             var dependencySets = package.DependencySets?.ToList();
 
-                            // If no dependency sets, assume it's compatible with all frameworks
-                            if (dependencySets == null || !dependencySets.Any())
+                            if (dependencySets != null && dependencySets.Any())
                             {
-                                compatiblePackages.Add(package);
-                                continue;
-                            }
-
-                            // Check if package supports any of our target frameworks
-                            bool isCompatible = false;
-                            foreach (var framework in frameworks)
-                            {
-                                var compatibleDependencySet = dependencySets.FirstOrDefault(ds =>
-                                    ds.TargetFramework.Equals(NuGetFramework.AnyFramework) ||
-                                    DefaultCompatibilityProvider.Instance.IsCompatible(framework, ds.TargetFramework));
-
-                                if (compatibleDependencySet != null)
+                                // Check if package supports any of our target frameworks using dependency sets
+                                foreach (var framework in frameworks)
                                 {
-                                    isCompatible = true;
-                                    break;
+                                    var compatibleDependencySet = dependencySets.FirstOrDefault(ds =>
+                                        ds.TargetFramework.Equals(NuGetFramework.AnyFramework) ||
+                                        DefaultCompatibilityProvider.Instance.IsCompatible(framework, ds.TargetFramework));
+
+                                    if (compatibleDependencySet != null)
+                                    {
+                                        isCompatible = true;
+                                        break;
+                                    }
                                 }
+
+                                // Additional check: if package doesn't support netstandard2.x but we target it, skip
+                                var hasNetStandardTargets = frameworks.Any(f =>
+                                    f.Framework.Equals(".NETStandard", StringComparison.OrdinalIgnoreCase) &&
+                                    (f.Version.Major == 2 && f.Version.Minor <= 1));
+
+                                if (hasNetStandardTargets && isCompatible)
+                                {
+                                    // Double-check that the package actually supports netstandard2.x
+                                    var supportsNetStandard2x = dependencySets.Any(ds =>
+                                        ds.TargetFramework.Framework.Equals(".NETStandard", StringComparison.OrdinalIgnoreCase) &&
+                                        ds.TargetFramework.Version.Major == 2 && ds.TargetFramework.Version.Minor <= 1);
+
+                                    if (!supportsNetStandard2x)
+                                    {
+                                        // Check if newer frameworks can satisfy this but not netstandard2.x
+                                        var supportsNewerFrameworks = dependencySets.Any(ds =>
+                                            (ds.TargetFramework.Framework.Equals(".NETCoreApp", StringComparison.OrdinalIgnoreCase) && ds.TargetFramework.Version.Major >= 6) ||
+                                            (ds.TargetFramework.Framework.Equals(".NETStandard", StringComparison.OrdinalIgnoreCase) && ds.TargetFramework.Version.Major > 2));
+
+                                        if (supportsNewerFrameworks)
+                                        {
+                                            _uiService.DisplayDebug($"Package {packageId} v{package.Identity.Version} supports newer frameworks but not netstandard2.x - skipping");
+                                            isCompatible = false;
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // If no dependency sets, be very conservative - don't assume compatibility
+                                _uiService.DisplayDebug($"Package {packageId} v{package.Identity.Version} has no dependency information - being conservative");
+                                isCompatible = false;
                             }
 
                             if (isCompatible)
@@ -207,51 +210,13 @@ public class NuGetPackageService
             }
         }
 
-        // Fallback to regular version check
-        return await GetLatestVersionAsync(packageId, includePrerelease, cancellationToken);
-    }
-
-    private int? GetFrameworkMajorVersion(string targetFramework)
-    {
-        // Extract major version from frameworks like "net8.0", "net9.0"
-        if (targetFramework.StartsWith("net") && targetFramework.Contains("."))
-        {
-            var versionPart = targetFramework.Substring(3); // Remove "net"
-            var dotIndex = versionPart.IndexOf('.');
-            if (dotIndex > 0)
-            {
-                var majorVersionStr = versionPart.Substring(0, dotIndex);
-                if (int.TryParse(majorVersionStr, out int majorVersion))
-                {
-                    return majorVersion;
-                }
-            }
-        }
+        // Don't fallback to regular version check when using framework-aware checking
+        // This prevents incompatible package updates
+        _uiService.DisplayDebug($"No compatible version found for {packageId} with target frameworks: {string.Join(", ", targetFrameworks)}");
         return null;
     }
 
-    private bool IsFrameworkSpecificPackage(string packageId)
-    {
-        // List of package prefixes that typically follow .NET framework versioning
-        var frameworkSpecificPrefixes = new[]
-        {
-            "Microsoft.AspNetCore",
-            "Microsoft.EntityFrameworkCore",
-            "Microsoft.Extensions",
-            "Microsoft.Maui",
-            "Microsoft.WindowsDesktop",
-            "Microsoft.VisualStudio.Web.CodeGeneration"
-        };
 
-        // Also check for packages that have .NET-aligned versioning patterns
-        var frameworkSpecificExactMatches = new[]
-        {
-            "System.Text.Json"
-        };
-
-        return frameworkSpecificPrefixes.Any(prefix => packageId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) ||
-               frameworkSpecificExactMatches.Any(exact => string.Equals(packageId, exact, StringComparison.OrdinalIgnoreCase));
-    }
 
     public async Task<PackageInfo?> GetPackageInfoAsync(string packageId, bool includePrerelease = false, CancellationToken cancellationToken = default)
     {

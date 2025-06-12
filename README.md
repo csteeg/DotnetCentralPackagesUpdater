@@ -13,7 +13,8 @@ A console application that helps you manage and update NuGet packages in .NET pr
 - ✅ **Prerelease Support**: Optionally include prerelease versions
 - ✅ **Conditional Package Support**: Handles framework-specific conditional packages
 - ✅ **GlobalPackageReference Support**: Manages global analyzer and tool packages
-- ✅ **Framework-Aware Updates**: Suggests appropriate versions per target framework
+- ✅ **Framework-Aware Updates**: Intelligent compatibility checking based on actual package metadata
+- ✅ **Directory.Build.props Support**: Automatically detects target frameworks from Directory.Build.props files
 - ✅ **Detailed Information**: Shows package descriptions and publish dates
 - ✅ **Error Handling**: Graceful handling of network issues and missing packages
 
@@ -222,6 +223,32 @@ Packages with available updates:
 └──────────────────────────────────────────────┴─────────────────┴────────────────┘
 ```
 
+## Directory.Build.props Support
+
+The tool automatically detects target frameworks from `Directory.Build.props` files, enabling proper framework-aware package management even when individual project files don't explicitly define target frameworks.
+
+### How It Works
+
+1. **Automatic Discovery**: Walks up the directory tree to find `Directory.Build.props` files
+2. **Property Inheritance**: Loads global properties like `TargetFramework` and `TargetFrameworks`
+3. **Project Override**: Individual project files can still override global settings
+4. **Framework Detection**: Uses detected frameworks for compatibility checking and version suggestions
+
+### Example Directory.Build.props
+
+```xml
+<Project>
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <LangVersion>12</LangVersion>
+    <Nullable>enable</Nullable>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>
+```
+
+When projects don't define their own `TargetFramework`, they inherit `net8.0;net9.0` from the `Directory.Build.props`, and the tool will use this for framework-aware package analysis.
+
 ## Conditional Package Support
 
 The tool supports **conditional packages** with framework-specific conditions, which is especially useful for multi-targeting projects.
@@ -252,11 +279,14 @@ For projects that target multiple frameworks (e.g., `net8.0` and `net9.0`), you 
 
 ### Framework-Aware Version Selection
 
-The tool provides **intelligent framework-aware updates**:
+The tool provides **intelligent framework-aware updates** based on actual package metadata:
 
-- **For `net8.0` packages**: Suggests the latest `8.x` version (e.g., `8.0.15 → 8.0.16`)
-- **For `net9.0` packages**: Suggests the latest `9.x` version (e.g., `9.0.4 → 9.0.5`)
-- **Prevents incompatible updates**: Won't suggest .NET 9 versions for .NET 8-specific conditions
+- **Compatibility Analysis**: Checks each package version against its actual supported frameworks (not naming conventions)
+- **Latest Compatible Versions**: Suggests the truly latest version that supports your target frameworks
+- **Cross-Framework Support**: A package supporting both .NET 8.0 and .NET 9.0 will suggest the latest version for both frameworks
+- **Example**: `Microsoft.Extensions.Logging.Abstractions 9.0.5` is correctly suggested for .NET 8.0 projects because it actually supports .NET 8.0
+
+This approach ensures you get the **latest compatible version** rather than artificially restricting versions based on naming patterns.
 
 ### Example Output with Conditional Packages
 
@@ -286,6 +316,58 @@ The tool supports the most common condition patterns:
 2. **Migration scenarios**: Gradually migrate from .NET 8 to .NET 9 while maintaining compatibility
 3. **Framework-specific features**: Use framework-specific APIs and optimizations
 4. **Dependency compatibility**: Ensure packages are compatible with specific .NET versions
+
+## Framework Compatibility Protection
+
+The tool includes **intelligent framework compatibility protection** that prevents incompatible package updates for multi-targeting projects.
+
+### 🛡️ Automatic Compatibility Checking
+
+When your project targets multiple frameworks (e.g., `net8.0;net9.0;netstandard2.0;netstandard2.1`), the tool:
+
+- ✅ **Analyzes package metadata** to determine supported frameworks
+- ✅ **Filters out incompatible versions** that dropped support for your target frameworks
+- ✅ **Suggests the latest compatible version** instead of the absolute latest
+- ✅ **Prevents breaking changes** from packages that dropped older framework support
+
+### 📋 Example: FluentValidation Protection
+
+```xml
+<!-- Your project targets multiple frameworks -->
+<PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;netstandard2.0;netstandard2.1</TargetFrameworks>
+</PropertyGroup>
+```
+
+**Before (v1.4.1):** Tool would suggest FluentValidation 12.0.0 ❌ (breaks netstandard2.x)  
+**After (v1.4.2):** Tool suggests FluentValidation 11.11.0 ✅ (compatible with all frameworks)
+
+### 🎯 How It Works
+
+1. **Framework Analysis**: Detects all target frameworks in your projects
+2. **Metadata Inspection**: Downloads package dependency information from NuGet
+3. **Compatibility Matrix**: Uses NuGet's official compatibility APIs
+4. **Smart Filtering**: Only suggests versions compatible with ALL your target frameworks
+5. **Conservative Approach**: When in doubt, skips the update rather than breaking compatibility
+
+### 🚨 Protected Scenarios
+
+The tool protects against common breaking changes:
+
+- **FluentValidation 12.x**: Dropped netstandard2.0/2.1 support
+- **System.Text.Json 8.x+**: Limited netstandard2.0 support  
+- **Microsoft.Extensions.* 9.x**: Some packages dropped older framework support
+- **Entity Framework 8.x+**: Changed minimum framework requirements
+
+### ⚙️ Debug Information
+
+Use the `--dry-run` flag to see compatibility decisions:
+
+```bash
+cpup --dry-run --path .
+```
+
+The tool will show debug information about why certain package versions were skipped for compatibility reasons.
 
 ## NuGet.config Support
 
@@ -422,6 +504,46 @@ To publish updates to NuGet.org:
    ```bash
    dotnet nuget push bin/Release/CentralNuGetUpdater.*.nupkg --api-key YOUR_API_KEY --source https://api.nuget.org/v3/index.json
    ```
+
+## Recent Improvements (v1.4.2)
+
+### 🛡️ Framework Compatibility Protection
+- **Intelligent Compatibility Checking**: Prevents incompatible package updates for multi-targeting projects
+- **Breaking Change Prevention**: Protects against packages that dropped support for older frameworks (netstandard2.0/2.1)
+- **Enhanced Framework Analysis**: Uses NuGet's official compatibility APIs instead of unsafe fallbacks
+- **Example Protection**: FluentValidation now correctly suggests v11.x (compatible) instead of v12.x (breaks netstandard2.x)
+- **Conservative Approach**: When package metadata is unclear, skips update rather than risking compatibility
+
+### 🔧 Technical Improvements
+- **Removed Unsafe Fallback**: No longer falls back to absolute latest version when framework checking fails
+- **Better Debug Logging**: Improved visibility into compatibility decisions
+- **Enhanced NetStandard Detection**: Specific logic to protect netstandard2.0/2.1 targets
+
+## Previous Improvements (v1.4.1)
+
+### 🛡️ Enhanced XML Parsing Robustness
+- **Case-Insensitive XML Parsing**: All XML tag names and attribute names are now parsed case-insensitively
+- **Improved Package Detection**: Resolves issues where packages weren't detected due to XML case variations (e.g., `version="9.0.4"` vs `Version="9.0.4"`)
+- **Mixed Casing Support**: Handles all XML case combinations (`PackageVersion`, `packageversion`, `PACKAGEVERSION`, etc.)
+- **Backward Compatible**: Maintains full compatibility with existing functionality
+
+## Previous Improvements (v1.4.0)
+
+### 🎯 Enhanced Framework Detection
+- **Directory.Build.props Support**: Automatically detects target frameworks from `Directory.Build.props` files
+- **Better Inheritance**: Properly handles framework inheritance when project files don't explicitly define target frameworks
+- **Improved Analysis**: More accurate framework detection for complex project structures
+
+### 🚀 Smarter Package Version Selection
+- **Metadata-Based Compatibility**: Replaced name-based heuristics with actual package metadata analysis
+- **Latest Compatible Versions**: Now suggests the truly latest version that supports your target frameworks
+- **Cross-Framework Packages**: Correctly handles packages that support multiple .NET versions
+- **Example Fix**: `Microsoft.Extensions.Logging.Abstractions 9.0.5` is now correctly suggested for .NET 8.0 projects
+
+### 🔧 Technical Improvements
+- **Removed Artificial Restrictions**: No longer artificially restricts package versions based on naming patterns
+- **Better Compatibility Checking**: Uses NuGet's official compatibility APIs
+- **More Accurate Updates**: Framework-aware updates based on actual package support, not version number alignment
 
 ## Contributing
 
