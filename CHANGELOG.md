@@ -5,7 +5,101 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.0] - 2025-01-25
+## [1.7.0]
+
+### Added
+
+- **📦 Package Source Mapping Support**: Full support for NuGet package source mapping as specified in `nuget.config` files
+- **Intelligent Source Selection**: Packages are only checked against their designated sources based on mapping patterns
+- **Performance Optimization**: Reduces unnecessary network requests by avoiding queries to irrelevant package sources
+- **Enterprise Security**: Prevents supply chain attacks by ensuring packages only come from designated, trusted sources
+
+### Features
+
+- **Pattern Matching**: Supports both exact package names and wildcard patterns (`MyCompany.*`, `*`)
+- **Precedence Rules**: Exact matches > prefix patterns > wildcard patterns for deterministic source selection
+- **Multi-Source Support**: Handles environments with multiple private feeds and public repositories
+- **XML Configuration**: Direct parsing of `packageSourceMapping` from `nuget.config` files
+
+### Technical Implementation
+
+- **Smart Source Filtering**: `GetRepositoriesForPackage()` method filters sources per package based on mappings
+- **XML Parsing**: Robust `LoadPackageSourceMapping()` method using System.Xml.Linq
+- **Pattern Recognition**: `IsPackageMatchingPattern()` handles exact matches and prefix wildcards
+- **Debug Information**: Comprehensive logging showing which sources each package maps to
+
+### Example Configuration
+
+```xml
+<packageSourceMapping>
+  <packageSource key="nuget.org">
+    <package pattern="*" />
+  </packageSource>
+  <packageSource key="company-feed">
+    <package pattern="MyCompany.*" />
+    <package pattern="Internal.Tools" />
+  </packageSource>
+</packageSourceMapping>
+```
+
+**Performance Impact:**
+
+- Before: 3 sources × 5 packages = 15 potential network requests
+- After: Each package only queries its designated source = 5 targeted requests
+
+### Security Benefits
+
+This feature helps prevent supply chain attacks by ensuring packages only come from designated, trusted sources, making it impossible for malicious packages to be fetched from unexpected sources.
+
+## [1.6.0]
+
+### Added
+
+- **🎯 Major Version Constraints for Conditional Packages**: Conditional packages with `TargetFramework` conditions now automatically constrain to the appropriate major version series
+- **Framework-Aligned Version Selection**: Packages conditioned on `'$(TargetFramework)' == 'net8.0'` stay within 8.x versions, preventing compatibility issues
+- **Smart Condition Parsing**: Automatically extracts framework versions from conditions to determine major version constraints
+- **Regex-Based Analysis**: Robust parsing of TargetFramework conditions with various formatting styles
+
+### Features
+
+- **Automatic Constraint Application**: No configuration needed - constraints are automatically applied to conditional packages
+- **Selective Application**: Only applies to packages with `TargetFramework` equality conditions (`==`)
+- **Framework Series Alignment**:
+  - `net8.0` conditions → constrains to 8.x versions
+  - `net6.0` conditions → constrains to 6.x versions
+  - `net9.0` conditions → constrains to 9.x versions
+- **Non-Conditional Package Preservation**: Regular packages and other condition types work exactly as before
+
+### Technical Improvements
+
+- **Enhanced GetLatestVersionForFrameworksAsync**: Added PackageInfo parameter and major version filtering logic
+- **New ExtractMajorVersionConstraintFromCondition**: Parses conditions like `'$(TargetFramework)' == 'net8.0'` to extract major version
+- **Version Filtering**: Compatible versions are filtered by major version before framework compatibility checks
+- **Debug Logging**: Added comprehensive debug messages for constraint application and version skipping decisions
+
+### Examples
+
+**Before (v1.5.0):**
+
+```xml
+<PackageVersion Include="Microsoft.AspNetCore.Authorization" Condition="'$(TargetFramework)' == 'net8.0'" Version="8.0.15" />
+```
+
+Could suggest updating to 9.0.6 (potentially breaking)
+
+**After (v1.6.0):**
+
+```xml
+<PackageVersion Include="Microsoft.AspNetCore.Authorization" Condition="'$(TargetFramework)' == 'net8.0'" Version="8.0.15" />
+```
+
+Will only suggest updates within 8.x series (e.g., 8.0.17) - safe and compatible
+
+### Why This Matters
+
+Prevents compatibility issues where packages like `Microsoft.AspNetCore.Authorization 9.0.x` might have .NET Standard 2.0 compatibility on paper but aren't truly compatible with .NET 8.0 applications in practice. This feature ensures framework-specific conditional packages stay within their intended major version series.
+
+## [1.5.0]
 
 ### Added
 
@@ -50,7 +144,7 @@ cpup --path "C:\Projects\MyProject" --dry-run
 cpup --path "C:\Projects\MyProject" --disable-framework-check --dry-run
 ```
 
-## [1.4.5] - 2025-01-25
+## [1.4.5]
 
 ### Added
 
@@ -71,14 +165,14 @@ cpup --path "C:\Projects\MyProject" --disable-framework-check --dry-run
 - **Fallback Detection**: Secondary pattern matching for edge cases where version parsing fails
 - **Per-Package Logic**: Each package is evaluated individually for prerelease inclusion
 
-## [1.4.4] - 2025-01-25
+## [1.4.4]
 
 ### Fixed
 
 - **Migration Service**: Fixed XML processing issue where Version attributes weren't properly removed from PackageReference items during migration
 - **Project File Updates**: Migration now correctly removes all Version attributes to prevent conflicts with Central Package Management
 
-## [1.4.3] - 2025-01-25
+## [1.4.3]
 
 ### Added
 
@@ -102,7 +196,7 @@ cpup --path "C:\Projects\MyProject" --disable-framework-check --dry-run
 - **Migration Service**: New `CentralPackageMigrationService` for handling conversions
 - **XML Processing**: Case-insensitive XML parsing for robust project file handling
 
-## [1.4.2] - 2025-01-25
+## [1.4.2]
 
 ### Fixed
 

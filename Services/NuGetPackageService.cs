@@ -8,6 +8,7 @@ using NuGet.Packaging.Core;
 using NuGet.Packaging;
 using CentralNuGetUpdater.Models;
 using System.Net;
+using System.Text.RegularExpressions;
 using NuGet.Credentials;
 
 namespace CentralNuGetUpdater.Services;
@@ -19,6 +20,7 @@ public class NuGetPackageService
     private readonly List<SourceRepository> _sourceRepositories;
     private readonly ConsoleUIService _uiService;
     private readonly string? _configFilePath;
+    private readonly Dictionary<string, List<string>>? _packageSourceMapping;
 
     public NuGetPackageService(string? configFilePath = null, ConsoleUIService? uiService = null)
     {
@@ -43,6 +45,13 @@ public class NuGetPackageService
         {
             // Fallback to nuget.org if no sources configured
             _sourceRepositories.Add(Repository.Factory.GetCoreV3("https://api.nuget.org/v3/index.json"));
+        }
+
+        // Setup package source mapping
+        _packageSourceMapping = LoadPackageSourceMapping();
+        if (_packageSourceMapping?.Any() == true)
+        {
+            _uiService.DisplayInfo("Package source mapping detected - packages will be checked against appropriate sources only");
         }
 
         _uiService.DisplayInfo($"Loaded {_sourceRepositories.Count} package source(s)");
@@ -81,9 +90,135 @@ public class NuGetPackageService
         }
     }
 
+    private Dictionary<string, List<string>>? LoadPackageSourceMapping()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_configFilePath) || !File.Exists(_configFilePath))
+            {
+                return null;
+            }
+
+            var doc = System.Xml.Linq.XDocument.Load(_configFilePath);
+            var packageSourceMappingElement = doc.Root?.Element("packageSourceMapping");
+
+            if (packageSourceMappingElement == null)
+            {
+                return null;
+            }
+
+            var mappings = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var packageSourceElement in packageSourceMappingElement.Elements("packageSource"))
+            {
+                var sourceName = packageSourceElement.Attribute("key")?.Value;
+                if (string.IsNullOrEmpty(sourceName))
+                {
+                    continue;
+                }
+
+                var patterns = new List<string>();
+                foreach (var packageElement in packageSourceElement.Elements("package"))
+                {
+                    var pattern = packageElement.Attribute("pattern")?.Value;
+                    if (!string.IsNullOrEmpty(pattern))
+                    {
+                        patterns.Add(pattern);
+                    }
+                }
+
+                if (patterns.Any())
+                {
+                    mappings[sourceName] = patterns;
+                }
+            }
+
+            return mappings.Any() ? mappings : null;
+        }
+        catch (Exception ex)
+        {
+            _uiService.DisplayDebug($"Failed to parse package source mapping: {ex.Message}");
+            return null;
+        }
+    }
+
+    private IEnumerable<SourceRepository> GetRepositoriesForPackage(string packageId)
+    {
+        if (_packageSourceMapping == null)
+        {
+            // No package source mapping configured, use all repositories
+            return _sourceRepositories;
+        }
+
+        var matchingSources = new List<string>();
+        string? bestMatchPattern = null;
+        int bestMatchLength = -1;
+
+        // Find the best matching pattern(s) for this package ID
+        foreach (var (sourceName, patterns) in _packageSourceMapping)
+        {
+            foreach (var pattern in patterns)
+            {
+                if (IsPackageMatchingPattern(packageId, pattern))
+                {
+                    int patternLength = pattern == "*" ? 0 : pattern.Length;
+
+                    if (patternLength > bestMatchLength)
+                    {
+                        // Found a more specific pattern
+                        bestMatchLength = patternLength;
+                        bestMatchPattern = pattern;
+                        matchingSources.Clear();
+                        matchingSources.Add(sourceName);
+                    }
+                    else if (patternLength == bestMatchLength)
+                    {
+                        // Found an equally specific pattern
+                        matchingSources.Add(sourceName);
+                    }
+                }
+            }
+        }
+
+        if (matchingSources.Any())
+        {
+            // Package has specific source mappings, filter repositories
+            var mappedRepositories = _sourceRepositories.Where(repo =>
+                matchingSources.Contains(repo.PackageSource.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+
+            if (mappedRepositories.Any())
+            {
+                _uiService.DisplayDebug($"Package {packageId} mapped to {mappedRepositories.Count} source(s) via pattern '{bestMatchPattern}': {string.Join(", ", mappedRepositories.Select(r => r.PackageSource.Name))}");
+                return mappedRepositories;
+            }
+        }
+
+        // Fallback to all repositories if no mapping found or mapping is empty
+        return _sourceRepositories;
+    }
+
+    private static bool IsPackageMatchingPattern(string packageId, string pattern)
+    {
+        if (pattern == "*")
+        {
+            return true;
+        }
+
+        if (pattern.EndsWith("*"))
+        {
+            // Prefix pattern
+            var prefix = pattern.Substring(0, pattern.Length - 1);
+            return packageId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Exact match
+        return string.Equals(packageId, pattern, StringComparison.OrdinalIgnoreCase);
+    }
+
     public async Task<string?> GetLatestVersionAsync(string packageId, bool includePrerelease = false, CancellationToken cancellationToken = default)
     {
-        foreach (var repository in _sourceRepositories)
+        var repositoriesToCheck = GetRepositoriesForPackage(packageId);
+        foreach (var repository in repositoriesToCheck)
         {
             try
             {
@@ -111,7 +246,7 @@ public class NuGetPackageService
         return null;
     }
 
-    public async Task<string?> GetLatestVersionForFrameworksAsync(string packageId, List<string> targetFrameworks, bool includePrerelease = false, CancellationToken cancellationToken = default)
+    public async Task<string?> GetLatestVersionForFrameworksAsync(string packageId, List<string> targetFrameworks, bool includePrerelease = false, PackageInfo? packageInfo = null, CancellationToken cancellationToken = default)
     {
         if (!targetFrameworks.Any())
         {
@@ -120,7 +255,19 @@ public class NuGetPackageService
 
         var frameworks = targetFrameworks.Select(NuGetFramework.Parse).ToList();
 
-        foreach (var repository in _sourceRepositories)
+        // Determine major version constraint for conditional packages
+        int? majorVersionConstraint = null;
+        if (packageInfo != null && !string.IsNullOrEmpty(packageInfo.Condition))
+        {
+            majorVersionConstraint = ExtractMajorVersionConstraintFromCondition(packageInfo.Condition);
+            if (majorVersionConstraint.HasValue)
+            {
+                _uiService.DisplayDebug($"Applying major version constraint {majorVersionConstraint}.x for conditional package {packageId}");
+            }
+        }
+
+        var repositoriesToCheck = GetRepositoriesForPackage(packageId);
+        foreach (var repository in repositoriesToCheck)
         {
             try
             {
@@ -191,7 +338,31 @@ public class NuGetPackageService
 
                             if (isCompatible)
                             {
-                                compatiblePackages.Add(package);
+                                // Apply major version constraint for conditional packages
+                                if (majorVersionConstraint.HasValue)
+                                {
+                                    try
+                                    {
+                                        var packageVersion = NuGetVersion.Parse(package.Identity.Version.ToString());
+                                        if (packageVersion.Major == majorVersionConstraint.Value)
+                                        {
+                                            compatiblePackages.Add(package);
+                                        }
+                                        else
+                                        {
+                                            _uiService.DisplayDebug($"Package {packageId} v{package.Identity.Version} skipped - major version {packageVersion.Major} doesn't match constraint {majorVersionConstraint}");
+                                        }
+                                    }
+                                    catch
+                                    {
+                                        // If version parsing fails, skip the constraint
+                                        compatiblePackages.Add(package);
+                                    }
+                                }
+                                else
+                                {
+                                    compatiblePackages.Add(package);
+                                }
                             }
                         }
                     }
@@ -299,12 +470,12 @@ public class NuGetPackageService
                         if (package.ApplicableFrameworks.Any())
                         {
                             // For conditional packages, use only the frameworks they apply to
-                            latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.ApplicableFrameworks, packageIncludePrerelease, cts.Token);
+                            latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.ApplicableFrameworks, packageIncludePrerelease, package, cts.Token);
                         }
                         else if (package.TargetFrameworks.Any())
                         {
                             // For non-conditional packages, use all target frameworks
-                            latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.TargetFrameworks, packageIncludePrerelease, cts.Token);
+                            latestVersion = await GetLatestVersionForFrameworksAsync(package.Id, package.TargetFrameworks, packageIncludePrerelease, null, cts.Token);
                         }
                         else
                         {
@@ -378,5 +549,22 @@ public class NuGetPackageService
                    lowerVersion.Contains("pre") ||
                    lowerVersion.Contains("-");
         }
+    }
+
+    private int? ExtractMajorVersionConstraintFromCondition(string condition)
+    {
+        // Extract framework version from conditions like:
+        // '$(TargetFramework)' == 'net8.0' -> should constrain to major version 8
+        // '$(TargetFramework)' == 'net6.0' -> should constrain to major version 6
+
+        var regex = new Regex(@"'\$\(TargetFramework\)'.*?==.*?'net(\d+)(?:\.\d+)?'");
+        var match = regex.Match(condition);
+
+        if (match.Success && int.TryParse(match.Groups[1].Value, out var majorVersion))
+        {
+            return majorVersion;
+        }
+
+        return null;
     }
 }

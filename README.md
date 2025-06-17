@@ -561,11 +561,96 @@ The tool will show debug information about why certain package versions were ski
 The tool automatically discovers and uses your `nuget.config` file. It supports:
 
 - **Package Sources**: Respects enabled/disabled sources
-- **Source Mapping**: Uses package source mapping rules
+- **Package Source Mapping**: Uses package source mapping rules for secure and efficient package resolution
 - **Authentication**: Works with authenticated feeds
 - **Fallback Sources**: Uses fallback feeds when configured
 
-Example `nuget.config`:
+### 📦 Package Source Mapping (v1.7.0+)
+
+Package Source Mapping provides enterprise-grade security and performance by ensuring packages only come from designated sources. This prevents supply chain attacks and reduces unnecessary network requests.
+
+#### Example `nuget.config` with Source Mapping:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+    <add key="CompanyFeed" value="https://pkgs.dev.azure.com/company/_packaging/internal/nuget/v3/index.json" />
+    <add key="HealthOSS" value="https://microsofthealthoss.pkgs.visualstudio.com/FhirServer/_packaging/Public/nuget/v3/index.json" />
+  </packageSources>
+  
+  <packageSourceMapping>
+    <!-- Microsoft Health packages only from Health OSS feed -->
+    <packageSource key="HealthOSS">
+      <package pattern="Microsoft.Health.*" />
+    </packageSource>
+    
+    <!-- Company packages only from internal feed -->
+    <packageSource key="CompanyFeed">
+      <package pattern="MyCompany.*" />
+      <package pattern="Internal.Tools" />
+    </packageSource>
+    
+    <!-- Everything else from nuget.org -->
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+```
+
+#### 🚀 Performance Benefits
+
+**Without Source Mapping:**
+- `MyCompany.Core` → Checks 3 sources = 3 network requests
+- `Newtonsoft.Json` → Checks 3 sources = 3 network requests  
+- `Microsoft.Health.Fhir` → Checks 3 sources = 3 network requests
+- **Total: 9 requests for 3 packages**
+
+**With Source Mapping:**
+- `MyCompany.Core` → Only checks `CompanyFeed` = 1 request
+- `Newtonsoft.Json` → Only checks `nuget.org` = 1 request
+- `Microsoft.Health.Fhir` → Only checks `HealthOSS` = 1 request
+- **Total: 3 requests for 3 packages (3x faster!)**
+
+#### 🔒 Security Benefits
+
+- **Prevents dependency confusion attacks** by ensuring packages only come from trusted sources
+- **Eliminates package hijacking risks** from unauthorized feeds
+- **Provides audit trail** of which source each package came from
+- **Enforces organizational policies** about package sources
+
+#### Pattern Matching Rules
+
+1. **Exact Match**: `Microsoft.Extensions.Logging` matches only that specific package
+2. **Prefix Wildcard**: `MyCompany.*` matches `MyCompany.Core`, `MyCompany.Authentication`, etc.
+3. **Global Wildcard**: `*` matches any package (lowest precedence)
+
+**Precedence Order:** Exact match > Longest prefix > Shorter prefix > Global wildcard
+
+#### Tool Output with Source Mapping
+
+```
+✓ Credential service configured - will use same authentication as 'dotnet restore'
+ℹ Package source mapping detected - packages will be checked against appropriate sources only
+ℹ Loaded 3 package source(s)
+ℹ   - nuget.org: https://api.nuget.org/v3/index.json
+ℹ   - CompanyFeed: https://pkgs.dev.azure.com/company/_packaging/internal/nuget/v3/index.json
+ℹ   - HealthOSS: https://microsofthealthoss.pkgs.visualstudio.com/FhirServer/_packaging/Public/nuget/v3/index.json
+
+Packages with available updates:
+┌────────────────────────────┬─────────────────┬────────────────┬────────────┬──────────────┐
+│ Package                    │ Current Version │ Latest Version │ Published  │ Source       │
+├────────────────────────────┼─────────────────┼────────────────┼────────────┼──────────────┤
+│ Newtonsoft.Json            │ 12.0.1          │ 13.0.3         │ 2023-03-08 │ nuget.org    │
+│ MyCompany.Core             │ 1.2.0           │ 1.3.1          │ 2024-01-15 │ CompanyFeed  │
+│ Microsoft.Health.Fhir.Core │ 3.1.0           │ 4.0.445        │ 2024-02-07 │ HealthOSS    │
+└────────────────────────────┴─────────────────┴────────────────┴────────────┴──────────────┘
+```
+
+### Basic `nuget.config` (No Source Mapping)
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
