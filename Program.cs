@@ -39,6 +39,12 @@ class Program
             getDefaultValue: () => false);
         disableFrameworkCheckOption.AddAlias("--no-framework-check");
 
+        var verboseOption = new Option<bool>(
+            name: "--verbose",
+            description: "Show detailed debug output during processing",
+            getDefaultValue: () => false);
+        verboseOption.AddAlias("-v");
+
         // Migration command
         var migrateCommand = new Command("migrate", "Migrate a solution from regular PackageReference to Central Package Management");
 
@@ -67,19 +73,20 @@ class Program
         rootCommand.AddOption(prereleaseOption);
         rootCommand.AddOption(dryRunOption);
         rootCommand.AddOption(disableFrameworkCheckOption);
+        rootCommand.AddOption(verboseOption);
         rootCommand.AddCommand(migrateCommand);
 
-        rootCommand.SetHandler(async (path, configPath, includePrerelease, dryRun, disableFrameworkCheck) =>
+        rootCommand.SetHandler(async (path, configPath, includePrerelease, dryRun, disableFrameworkCheck, verbose) =>
         {
-            await RunUpdater(path, configPath, includePrerelease, dryRun, disableFrameworkCheck);
-        }, pathOption, configOption, prereleaseOption, dryRunOption, disableFrameworkCheckOption);
+            await RunUpdater(path, configPath, includePrerelease, dryRun, disableFrameworkCheck, verbose);
+        }, pathOption, configOption, prereleaseOption, dryRunOption, disableFrameworkCheckOption, verboseOption);
 
         return await rootCommand.InvokeAsync(args);
     }
 
-    static async Task RunUpdater(string path, string? configPath, bool includePrerelease, bool dryRun, bool disableFrameworkCheck)
+    static async Task RunUpdater(string path, string? configPath, bool includePrerelease, bool dryRun, bool disableFrameworkCheck, bool verbose)
     {
-        var ui = new ConsoleUIService();
+        var ui = new ConsoleUIService(verbose);
         ui.DisplayWelcome();
 
         try
@@ -90,7 +97,8 @@ class Program
             {
                 // User provided the full path to the file
                 directoryPackagesPath = path;
-                path = Path.GetDirectoryName(path)!; // Update path to be the directory for auto-config detection
+                var directoryPath = Path.GetDirectoryName(path);
+                path = !string.IsNullOrEmpty(directoryPath) ? directoryPath : Directory.GetCurrentDirectory();
             }
             else
             {
@@ -113,6 +121,8 @@ class Program
                     configPath = autoDetectedConfig;
                 }
             }
+
+
 
             // Analyze solution for target frameworks
             ui.DisplayProgress("Analyzing solution and projects...");

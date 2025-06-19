@@ -5,7 +5,12 @@ namespace CentralNuGetUpdater.Services;
 
 public class ConsoleUIService
 {
+    private readonly bool _verbose;
 
+    public ConsoleUIService(bool verbose = false)
+    {
+        _verbose = verbose;
+    }
 
     public void DisplayWelcome()
     {
@@ -420,10 +425,10 @@ public class ConsoleUIService
 
                                 await action(item);
                             }
-                            catch (Exception ex)
+                            catch
                             {
-                                // Log error but don't stop processing
-                                AnsiConsole.WriteLine($"[red]Error processing {getItemDescription?.Invoke(item) ?? "item"}: {ex.Message}[/]");
+                                // Let detailed error reporting from NuGetPackageService show through
+                                // Don't suppress the detailed error messages
                             }
 
                             var newProcessed = Interlocked.Increment(ref processed);
@@ -500,9 +505,11 @@ public class ConsoleUIService
 
     public void DisplayDebug(string message)
     {
-        // Only show debug messages if verbose mode is enabled
-        // For now, we'll skip debug messages to avoid clutter
-        // AnsiConsole.MarkupLine($"[grey]Debug: {message}[/]");
+        // Only show debug messages when verbose mode is enabled
+        if (_verbose)
+        {
+            AnsiConsole.MarkupLine($"[grey]Debug: {message}[/]");
+        }
     }
 
     public (string username, string password) PromptForCredentials(string feedName)

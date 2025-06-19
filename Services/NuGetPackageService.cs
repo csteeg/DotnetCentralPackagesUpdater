@@ -69,8 +69,16 @@ public class NuGetPackageService
         }
         else
         {
-            var configDirectory = Path.GetDirectoryName(configFilePath) ?? Directory.GetCurrentDirectory();
+            var configDirectory = Path.GetDirectoryName(configFilePath);
+            if (string.IsNullOrEmpty(configDirectory))
+            {
+                // Handle relative paths like "nuget.config"
+                configDirectory = Directory.GetCurrentDirectory();
+            }
             var configFileName = Path.GetFileName(configFilePath);
+
+
+
             return Settings.LoadSpecificSettings(configDirectory, configFileName);
         }
     }
@@ -94,6 +102,7 @@ public class NuGetPackageService
     {
         try
         {
+            // Manual XML parsing - the NuGet API for package source mapping is complex
             if (string.IsNullOrEmpty(_configFilePath) || !File.Exists(_configFilePath))
             {
                 return null;
@@ -135,9 +144,8 @@ public class NuGetPackageService
 
             return mappings.Any() ? mappings : null;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _uiService.DisplayDebug($"Failed to parse package source mapping: {ex.Message}");
             return null;
         }
     }
@@ -176,6 +184,7 @@ public class NuGetPackageService
                         // Found an equally specific pattern
                         matchingSources.Add(sourceName);
                     }
+
                 }
             }
         }
@@ -188,7 +197,6 @@ public class NuGetPackageService
 
             if (mappedRepositories.Any())
             {
-                _uiService.DisplayDebug($"Package {packageId} mapped to {mappedRepositories.Count} source(s) via pattern '{bestMatchPattern}': {string.Join(", ", mappedRepositories.Select(r => r.PackageSource.Name))}");
                 return mappedRepositories;
             }
         }
@@ -237,8 +245,25 @@ public class NuGetPackageService
             }
             catch (Exception ex)
             {
-                // With the credential service set up, authentication should be handled automatically
-                _uiService.DisplayDebug($"Failed to check version for {packageId} from {repository.PackageSource.Name}: {ex.Message}");
+                // Show detailed error information for better debugging
+                var errorDetails = $"Failed to check {packageId} from {repository.PackageSource.Name}:\n";
+                errorDetails += $"  Error Type: {ex.GetType().Name}\n";
+                errorDetails += $"  Message: {ex.Message}\n";
+
+                if (ex.InnerException != null)
+                {
+                    errorDetails += $"  Inner Exception: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}\n";
+                }
+
+                // For authentication/network errors, show more context
+                if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized") ||
+                    ex.Message.Contains("403") || ex.Message.Contains("Forbidden") ||
+                    ex.Message.Contains("authentication") || ex.Message.Contains("credential"))
+                {
+                    errorDetails += $"  This appears to be an authentication issue.\n";
+                }
+
+                _uiService.DisplayWarning(errorDetails.TrimEnd());
                 continue;
             }
         }
@@ -260,20 +285,26 @@ public class NuGetPackageService
         if (packageInfo != null && !string.IsNullOrEmpty(packageInfo.Condition))
         {
             majorVersionConstraint = ExtractMajorVersionConstraintFromCondition(packageInfo.Condition);
-            if (majorVersionConstraint.HasValue)
-            {
-                _uiService.DisplayDebug($"Applying major version constraint {majorVersionConstraint}.x for conditional package {packageId}");
-            }
         }
 
         var repositoriesToCheck = GetRepositoriesForPackage(packageId);
+        _uiService.DisplayDebug($"Framework-aware check for {packageId}: checking {repositoriesToCheck.Count()} repositories");
+
         foreach (var repository in repositoriesToCheck)
         {
             try
             {
+                _uiService.DisplayDebug($"Getting metadata resource for {packageId} from {repository.PackageSource.Name}");
+
+                // Add timeout to prevent hanging on individual repository calls
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
                 var metadataResource = await repository.GetResourceAsync<PackageMetadataResource>();
+
+                _uiService.DisplayDebug($"Getting package metadata for {packageId} from {repository.PackageSource.Name}");
                 var packages = await metadataResource.GetMetadataAsync(packageId, includePrerelease, false,
-                    new SourceCacheContext(), _logger, cancellationToken);
+                    new SourceCacheContext(), _logger, combinedCts.Token);
 
                 if (packages?.Any() == true)
                 {
@@ -302,7 +333,37 @@ public class NuGetPackageService
                                     }
                                 }
 
-                                // Additional check: if package doesn't support netstandard2.x but we target it, skip
+                                // If no exact compatibility found, be more permissive for common scenarios
+                                if (!isCompatible)
+                                {
+                                    // Allow packages that target "any" framework or have broad compatibility
+                                    var hasAnyFramework = dependencySets.Any(ds =>
+                                        ds.TargetFramework == NuGetFramework.AnyFramework ||
+                                        ds.TargetFramework.Framework.Equals("Any", StringComparison.OrdinalIgnoreCase));
+
+                                    if (hasAnyFramework)
+                                    {
+                                        isCompatible = true;
+                                    }
+                                    else
+                                    {
+                                        // For packages without clear compatibility, use a more lenient approach
+                                        // This helps with packages that have incomplete or unusual dependency metadata
+                                        var hasReasonableFrameworkSupport = dependencySets.Any(ds =>
+                                            ds.TargetFramework.Framework.Equals(".NETStandard", StringComparison.OrdinalIgnoreCase) ||
+                                            ds.TargetFramework.Framework.Equals(".NETCoreApp", StringComparison.OrdinalIgnoreCase) ||
+                                            ds.TargetFramework.Framework.Equals(".NETFramework", StringComparison.OrdinalIgnoreCase) ||
+                                            ds.TargetFramework.Framework.Equals("net", StringComparison.OrdinalIgnoreCase));
+
+                                        if (hasReasonableFrameworkSupport)
+                                        {
+                                            // Be more lenient - if the package supports any reasonable framework, allow it
+                                            isCompatible = true;
+                                        }
+                                    }
+                                }
+
+                                // Additional check: if package doesn't support netstandard2.x but we target it, be more permissive
                                 var hasNetStandardTargets = frameworks.Any(f =>
                                     f.Framework.Equals(".NETStandard", StringComparison.OrdinalIgnoreCase) &&
                                     (f.Version.Major == 2 && f.Version.Minor <= 1));
@@ -323,17 +384,25 @@ public class NuGetPackageService
 
                                         if (supportsNewerFrameworks)
                                         {
-                                            _uiService.DisplayDebug($"Package {packageId} v{package.Identity.Version} supports newer frameworks but not netstandard2.x - skipping");
-                                            isCompatible = false;
+                                            // Only skip if we ONLY target netstandard2.x and the package ONLY supports newer frameworks
+                                            var onlyTargetsNetStandard2x = frameworks.All(f =>
+                                                f.Framework.Equals(".NETStandard", StringComparison.OrdinalIgnoreCase) &&
+                                                f.Version.Major == 2 && f.Version.Minor <= 1);
+
+                                            if (onlyTargetsNetStandard2x)
+                                            {
+                                                isCompatible = false;
+                                            }
+                                            // If we also target other frameworks, allow the update
                                         }
                                     }
                                 }
                             }
                             else
                             {
-                                // If no dependency sets, be very conservative - don't assume compatibility
-                                _uiService.DisplayDebug($"Package {packageId} v{package.Identity.Version} has no dependency information - being conservative");
-                                isCompatible = false;
+                                // If no dependency sets, assume compatibility for common scenarios
+                                // This is less conservative but more practical for real-world packages
+                                isCompatible = true;
                             }
 
                             if (isCompatible)
@@ -347,10 +416,6 @@ public class NuGetPackageService
                                         if (packageVersion.Major == majorVersionConstraint.Value)
                                         {
                                             compatiblePackages.Add(package);
-                                        }
-                                        else
-                                        {
-                                            _uiService.DisplayDebug($"Package {packageId} v{package.Identity.Version} skipped - major version {packageVersion.Major} doesn't match constraint {majorVersionConstraint}");
                                         }
                                     }
                                     catch
@@ -370,21 +435,66 @@ public class NuGetPackageService
                     var latestCompatible = compatiblePackages.FirstOrDefault();
                     if (latestCompatible != null)
                     {
+                        _uiService.DisplayDebug($"Found compatible version for {packageId}: {latestCompatible.Identity.Version}");
                         return latestCompatible.Identity.Version.ToString();
+                    }
+                    else
+                    {
+                        _uiService.DisplayDebug($"No compatible packages found for {packageId} from {repository.PackageSource.Name}");
                     }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                _uiService.DisplayDebug($"Timeout checking {packageId} from {repository.PackageSource.Name} (15s limit)");
+                continue;
+            }
             catch (Exception ex)
             {
-                _uiService.DisplayDebug($"Failed to check framework-specific version for {packageId} from {repository.PackageSource.Name}: {ex.Message}");
+                // Show detailed error information for better debugging
+                var errorDetails = $"Failed to check {packageId} (framework-aware) from {repository.PackageSource.Name}:\n";
+                errorDetails += $"  Error Type: {ex.GetType().Name}\n";
+                errorDetails += $"  Message: {ex.Message}\n";
+
+                if (ex.InnerException != null)
+                {
+                    errorDetails += $"  Inner Exception: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}\n";
+                }
+
+                // For authentication/network errors, show more context
+                if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized") ||
+                    ex.Message.Contains("403") || ex.Message.Contains("Forbidden") ||
+                    ex.Message.Contains("authentication") || ex.Message.Contains("credential"))
+                {
+                    errorDetails += $"  This appears to be an authentication issue.\n";
+                }
+
+                _uiService.DisplayWarning(errorDetails.TrimEnd());
                 continue;
             }
         }
 
-        // Don't fallback to regular version check when using framework-aware checking
-        // This prevents incompatible package updates
-        _uiService.DisplayDebug($"No compatible version found for {packageId} with target frameworks: {string.Join(", ", targetFrameworks)}");
-        return null;
+        // Fallback to regular version check if framework-aware checking found no compatible packages
+        // This ensures we don't miss updates for packages with incomplete metadata
+        _uiService.DisplayDebug($"No framework-compatible version found for {packageId}, falling back to simple version check");
+
+        try
+        {
+            // Add timeout to prevent hanging
+            using var fallbackCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, fallbackCts.Token);
+            return await GetLatestVersionAsync(packageId, includePrerelease, combinedCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            _uiService.DisplayDebug($"Fallback version check timed out for {packageId}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _uiService.DisplayDebug($"Fallback version check failed for {packageId}: {ex.Message}");
+            return null;
+        }
     }
 
 
@@ -414,8 +524,25 @@ public class NuGetPackageService
             }
             catch (Exception ex)
             {
-                // With the credential service set up, authentication should be handled automatically
-                _uiService.DisplayDebug($"Failed to get metadata for {packageId} from {repository.PackageSource.Name}: {ex.Message}");
+                // Show detailed error information for better debugging
+                var errorDetails = $"Failed to get metadata for {packageId} from {repository.PackageSource.Name}:\n";
+                errorDetails += $"  Error Type: {ex.GetType().Name}\n";
+                errorDetails += $"  Message: {ex.Message}\n";
+
+                if (ex.InnerException != null)
+                {
+                    errorDetails += $"  Inner Exception: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}\n";
+                }
+
+                // For authentication/network errors, show more context
+                if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized") ||
+                    ex.Message.Contains("403") || ex.Message.Contains("Forbidden") ||
+                    ex.Message.Contains("authentication") || ex.Message.Contains("credential"))
+                {
+                    errorDetails += $"  This appears to be an authentication issue.\n";
+                }
+
+                _uiService.DisplayDebug(errorDetails.TrimEnd());
                 continue;
             }
         }
@@ -514,7 +641,25 @@ public class NuGetPackageService
                 }
                 catch (Exception ex)
                 {
-                    _uiService.DisplayDebug($"Error checking updates for {package.Id}: {ex.Message}");
+                    // Show detailed error information for better debugging
+                    var errorDetails = $"Error checking updates for {package.Id}:\n";
+                    errorDetails += $"  Error Type: {ex.GetType().Name}\n";
+                    errorDetails += $"  Message: {ex.Message}\n";
+
+                    if (ex.InnerException != null)
+                    {
+                        errorDetails += $"  Inner Exception: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}\n";
+                    }
+
+                    // For authentication/network errors, show more context
+                    if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized") ||
+                        ex.Message.Contains("403") || ex.Message.Contains("Forbidden") ||
+                        ex.Message.Contains("authentication") || ex.Message.Contains("credential"))
+                    {
+                        errorDetails += $"  This appears to be an authentication issue.\n";
+                    }
+
+                    _uiService.DisplayWarning(errorDetails.TrimEnd());
                 }
             },
             package => package.Id); // Show package name in progress
