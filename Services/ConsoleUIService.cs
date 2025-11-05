@@ -51,9 +51,10 @@ public class ConsoleUIService
             AnsiConsole.WriteLine();
         }
 
-        var packagesWithUpdates = packages.Where(p => p.HasUpdate).ToList();
-        var packagesUpToDate = packages.Where(p => !p.HasUpdate && !string.IsNullOrEmpty(p.LatestVersion)).ToList();
-        var packagesWithErrors = packages.Where(p => string.IsNullOrEmpty(p.LatestVersion)).ToList();
+        var packagesWithUpdates = packages.Where(p => p.HasUpdate && !p.IsExcluded).ToList();
+        var packagesUpToDate = packages.Where(p => !p.HasUpdate && !string.IsNullOrEmpty(p.LatestVersion) && !p.IsExcluded).ToList();
+        var packagesWithErrors = packages.Where(p => string.IsNullOrEmpty(p.LatestVersion) && !p.IsExcluded).ToList();
+        var excludedPackages = packages.Where(p => p.IsExcluded).ToList();
 
         if (packagesWithUpdates.Any())
         {
@@ -171,6 +172,47 @@ public class ConsoleUIService
 
                 AnsiConsole.MarkupLine($"[red]• {package.Id} ({version})[/]");
             }
+            AnsiConsole.WriteLine();
+        }
+
+        if (excludedPackages.Any())
+        {
+            AnsiConsole.MarkupLine("[bold yellow]Packages excluded from updates:[/]");
+            var excludedTable = new Table();
+            excludedTable.AddColumn("Package");
+            excludedTable.AddColumn("Version");
+            excludedTable.AddColumn("Reason");
+
+            foreach (var package in excludedPackages)
+            {
+                var version = package.CurrentVersion;
+                if (package.IsCurrentVersionPrerelease)
+                {
+                    version = $"{version} [dim](pre)[/]";
+                }
+
+                var indicators = new List<string>();
+                if (package.IsGlobal)
+                {
+                    indicators.Add("Global");
+                }
+                if (!string.IsNullOrEmpty(package.Condition))
+                {
+                    indicators.Add(package.Condition);
+                }
+
+                var reason = indicators.Any() 
+                    ? string.Join(", ", indicators)
+                    : "Excluded";
+
+                excludedTable.AddRow(
+                    package.Id,
+                    $"[yellow]{version}[/]",
+                    $"[dim]{reason}[/]"
+                );
+            }
+
+            AnsiConsole.Write(excludedTable);
             AnsiConsole.WriteLine();
         }
     }

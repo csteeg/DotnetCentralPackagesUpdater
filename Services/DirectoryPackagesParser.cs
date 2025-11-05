@@ -50,6 +50,10 @@ public class DirectoryPackagesParser
                 var privateAssets = GetAttributeCaseInsensitive(element, "PrivateAssets")?.Value;
                 var includeAssets = GetAttributeCaseInsensitive(element, "IncludeAssets")?.Value;
                 var isGlobal = IsElementNameMatch(element, "GlobalPackageReference");
+                
+                // Check for exclusion attribute: FreezeVersion="true"
+                var freezeVersionAttr = GetAttributeCaseInsensitive(element, "FreezeVersion")?.Value;
+                var isExcluded = !string.IsNullOrEmpty(freezeVersionAttr) && freezeVersionAttr.Equals("true", StringComparison.OrdinalIgnoreCase);
 
                 if (!string.IsNullOrEmpty(include) && !string.IsNullOrEmpty(version))
                 {
@@ -81,7 +85,8 @@ public class DirectoryPackagesParser
                         IncludeAssets = includeAssets,
                         HasPrivateAssets = !string.IsNullOrEmpty(privateAssets) &&
                                          privateAssets.Equals("All", StringComparison.OrdinalIgnoreCase),
-                        IsAnalyzerPackage = IsAnalyzerOrTestPackage(include, privateAssets, includeAssets)
+                        IsAnalyzerPackage = IsAnalyzerOrTestPackage(include, privateAssets, includeAssets),
+                        IsExcluded = isExcluded
                     };
 
                     // Determine applicable frameworks based on condition
@@ -134,6 +139,7 @@ public class DirectoryPackagesParser
                     p.Id == include &&
                     p.IsSelected &&
                     p.HasUpdate &&
+                    !p.IsExcluded &&
                     p.Condition == condition &&
                     p.IsGlobal == isGlobal);
 
