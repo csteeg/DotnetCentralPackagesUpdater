@@ -192,6 +192,10 @@ public class ConsoleUIService
                 }
 
                 var indicators = new List<string>();
+                if (package.IsExcluded)
+                {
+                    indicators.Add("FreezeVersion");
+                }
                 if (package.IsGlobal)
                 {
                     indicators.Add("Global");
@@ -219,7 +223,7 @@ public class ConsoleUIService
 
     public List<PackageInfo> SelectPackagesToUpdate(List<PackageInfo> packages)
     {
-        var packagesWithUpdates = packages.Where(p => p.HasUpdate).ToList();
+        var packagesWithUpdates = packages.Where(p => p.HasUpdate && !p.IsExcluded).ToList();
 
         if (!packagesWithUpdates.Any())
         {
