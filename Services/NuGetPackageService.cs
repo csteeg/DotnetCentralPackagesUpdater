@@ -552,11 +552,21 @@ public class NuGetPackageService
 
     public async Task CheckForUpdatesAsync(List<PackageInfo> packages, bool includePrerelease = false, bool dryRun = false, bool disableFrameworkCheck = false)
     {
+        // Separate excluded packages from packages to check
+        var excludedPackages = packages.Where(p => p.IsExcluded).ToList();
+        var packagesToCheck = packages.Where(p => !p.IsExcluded).ToList();
+
+        // Show info about excluded packages
+        if (excludedPackages.Any())
+        {
+            _uiService.DisplayInfo($"Skipping {excludedPackages.Count} excluded package(s) from update checks");
+        }
+
         // Check if we have framework information
-        var hasFrameworkInfo = packages.Any(p => p.TargetFrameworks.Any());
+        var hasFrameworkInfo = packagesToCheck.Any(p => p.TargetFrameworks.Any());
         if (hasFrameworkInfo && !disableFrameworkCheck)
         {
-            var allFrameworks = packages.SelectMany(p => p.TargetFrameworks).Distinct().ToList();
+            var allFrameworks = packagesToCheck.SelectMany(p => p.TargetFrameworks).Distinct().ToList();
             _uiService.DisplayInfo($"Using framework-aware updates for: {string.Join(", ", allFrameworks)}");
         }
         else if (disableFrameworkCheck)
@@ -564,10 +574,10 @@ public class NuGetPackageService
             _uiService.DisplayInfo("Framework-aware checking disabled - checking all packages without framework constraints");
         }
 
-        // Use progress display for better user experience
+        // Use progress display for better user experience (only for non-excluded packages)
         await _uiService.DisplayProgressWithUpdatesAsync(
             $"Checking for updates",
-            packages,
+            packagesToCheck,
             async package =>
             {
                 try
@@ -664,8 +674,8 @@ public class NuGetPackageService
             },
             package => package.Id); // Show package name in progress
 
-        // Report packages that couldn't be resolved
-        var packagesWithoutVersion = packages.Where(p => string.IsNullOrEmpty(p.LatestVersion)).ToList();
+        // Report packages that couldn't be resolved (excluding excluded packages)
+        var packagesWithoutVersion = packagesToCheck.Where(p => string.IsNullOrEmpty(p.LatestVersion)).ToList();
         if (packagesWithoutVersion.Any())
         {
             _uiService.DisplayWarning($"Could not resolve version for {packagesWithoutVersion.Count} package(s):");

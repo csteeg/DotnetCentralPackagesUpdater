@@ -72,4 +72,7 @@ public class PackageInfo
     public bool IsAnalyzerPackage { get; set; } // Whether this is likely an analyzer package
     public string? PrivateAssets { get; set; } // The actual PrivateAssets value
     public string? IncludeAssets { get; set; } // The IncludeAssets value
+
+    // Exclusion properties
+    public bool IsExcluded { get; set; } // Whether this package should be excluded from updates
 }
